@@ -24,6 +24,7 @@ import org.apache.jackrabbit.core.state.ItemStateManager;
 import org.apache.jackrabbit.spi.Name;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.Term;
+import org.apache.lucene.search.Filter;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.Sort;
@@ -50,6 +51,7 @@ public class JackrabbitIndexSearcher
      * The item state manager of the workspace.
      */
     private final ItemStateManager ism;
+    private final Filter filter;
 
     /**
      * Creates a new jackrabbit index searcher.
@@ -61,10 +63,18 @@ public class JackrabbitIndexSearcher
     public JackrabbitIndexSearcher(SessionImpl s,
                                    IndexReader r,
                                    ItemStateManager ism) {
+        this(s,r, ism, null);
+    }
+
+    public JackrabbitIndexSearcher(SessionImpl s,
+                                   IndexReader r,
+                                   ItemStateManager ism,
+                                   Filter f) {
         super(r);
         this.session = s;
         this.reader = r;
         this.ism = ism;
+        this.filter = f;
     }
 
     /**
@@ -151,5 +161,12 @@ public class JackrabbitIndexSearcher
      */
     public ItemStateManager getItemStateManager() {
         return ism;
+    }
+
+    /**
+     * @return the {@link Filter} used for this searcher or {@code null} if not present
+     */
+    public Filter getFilter() {
+        return filter;
     }
 }
