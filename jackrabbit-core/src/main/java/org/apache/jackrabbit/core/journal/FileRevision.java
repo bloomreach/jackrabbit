@@ -119,6 +119,12 @@ public class FileRevision implements InstanceRevision {
         }
     }
     
+    @Override
+    public void setToGlobalRevision() throws JournalException {
+        // there is no separate global
+        return;
+    }
+
     /**
      * Close file revision. Closes underlying random access file.
      */
