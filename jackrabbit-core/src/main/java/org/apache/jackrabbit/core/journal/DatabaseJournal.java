@@ -311,7 +311,7 @@ public class DatabaseJournal extends AbstractJournal implements DatabaseAware {
     protected CheckSchemaOperation createCheckSchemaOperation() {
         InputStream in = DatabaseJournal.class.getResourceAsStream(databaseType + ".ddl");
         return new CheckSchemaOperation(conHelper, in, schemaObjectPrefix + DEFAULT_JOURNAL_TABLE).addVariableReplacement(
-            CheckSchemaOperation.SCHEMA_OBJECT_PREFIX_VARIABLE, schemaObjectPrefix);
+                CheckSchemaOperation.SCHEMA_OBJECT_PREFIX_VARIABLE, schemaObjectPrefix);
     }
 
     /**
@@ -432,8 +432,8 @@ public class DatabaseJournal extends AbstractJournal implements DatabaseAware {
      * out of memory. See JCR-2832
      *
      * @param startRevision start point (exclusive)
-     * @param startup indicates if the cluster node is syncing on startup 
-     *        or does a normal sync.
+     * @param startup       indicates if the cluster node is syncing on startup
+     *                      or does a normal sync.
      * @throws JournalException if an error occurs
      */
     @Override
@@ -477,7 +477,7 @@ public class DatabaseJournal extends AbstractJournal implements DatabaseAware {
             conHelper.exec(updateGlobalStmtSQL);
             rs = conHelper.exec(selectGlobalStmtSQL, null, false, 0);
             if (!rs.next()) {
-                 throw new JournalException("No revision available.");
+                throw new JournalException("No revision available.");
             }
             lockedRevision = rs.getLong(1);
             succeeded = true;
@@ -533,7 +533,7 @@ public class DatabaseJournal extends AbstractJournal implements DatabaseAware {
 
         try {
             conHelper.exec(insertRevisionStmtSQL, record.getRevision(), getId(), record.getProducerId(),
-                new StreamWrapper(in, length));
+                    new StreamWrapper(in, length));
 
         } catch (SQLException e) {
             String msg = "Unable to append revision " + lockedRevision + ".";
@@ -578,7 +578,7 @@ public class DatabaseJournal extends AbstractJournal implements DatabaseAware {
         // Run the schema check for the single table
         new CheckSchemaOperation(conHelper, localRevisionDDLStream, schemaObjectPrefix
                 + LOCAL_REVISIONS_TABLE).addVariableReplacement(
-            CheckSchemaOperation.SCHEMA_OBJECT_PREFIX_VARIABLE, schemaObjectPrefix).run();
+                CheckSchemaOperation.SCHEMA_OBJECT_PREFIX_VARIABLE, schemaObjectPrefix).run();
     }
 
     /**
@@ -587,31 +587,31 @@ public class DatabaseJournal extends AbstractJournal implements DatabaseAware {
      */
     protected void buildSQLStatements() {
         selectRevisionsStmtSQL =
-            "select REVISION_ID, JOURNAL_ID, PRODUCER_ID, REVISION_DATA from "
-            + schemaObjectPrefix + "JOURNAL where REVISION_ID > ? order by REVISION_ID";
+                "select REVISION_ID, JOURNAL_ID, PRODUCER_ID, REVISION_DATA from "
+                        + schemaObjectPrefix + "JOURNAL where REVISION_ID > ? order by REVISION_ID";
         updateGlobalStmtSQL =
-            "update " + schemaObjectPrefix + "GLOBAL_REVISION"
-            + " set REVISION_ID = REVISION_ID + 1";
+                "update " + schemaObjectPrefix + "GLOBAL_REVISION"
+                        + " set REVISION_ID = REVISION_ID + 1";
         selectGlobalStmtSQL =
-            "select REVISION_ID from "
-            + schemaObjectPrefix + "GLOBAL_REVISION";
+                "select REVISION_ID from "
+                        + schemaObjectPrefix + "GLOBAL_REVISION";
         insertRevisionStmtSQL =
-            "insert into " + schemaObjectPrefix + "JOURNAL"
-            + " (REVISION_ID, JOURNAL_ID, PRODUCER_ID, REVISION_DATA) "
-            + "values (?,?,?,?)";
+                "insert into " + schemaObjectPrefix + "JOURNAL"
+                        + " (REVISION_ID, JOURNAL_ID, PRODUCER_ID, REVISION_DATA) "
+                        + "values (?,?,?,?)";
         selectMinLocalRevisionStmtSQL =
-            "select MIN(REVISION_ID) from " + schemaObjectPrefix + "LOCAL_REVISIONS";
+                "select MIN(REVISION_ID) from " + schemaObjectPrefix + "LOCAL_REVISIONS";
         cleanRevisionStmtSQL =
-            "delete from " + schemaObjectPrefix + "JOURNAL " + "where REVISION_ID < ?";
+                "delete from " + schemaObjectPrefix + "JOURNAL " + "where REVISION_ID < ?";
         getLocalRevisionStmtSQL =
-            "select REVISION_ID from " + schemaObjectPrefix + "LOCAL_REVISIONS "
-            + "where JOURNAL_ID = ?";
+                "select REVISION_ID from " + schemaObjectPrefix + "LOCAL_REVISIONS "
+                        + "where JOURNAL_ID = ?";
         insertLocalRevisionStmtSQL =
-            "insert into " + schemaObjectPrefix + "LOCAL_REVISIONS "
-            + "(REVISION_ID, JOURNAL_ID) values (?,?)";
+                "insert into " + schemaObjectPrefix + "LOCAL_REVISIONS "
+                        + "(REVISION_ID, JOURNAL_ID) values (?,?)";
         updateLocalRevisionStmtSQL =
-            "update " + schemaObjectPrefix + "LOCAL_REVISIONS "
-            + "set REVISION_ID = ? where JOURNAL_ID = ?";
+                "update " + schemaObjectPrefix + "LOCAL_REVISIONS "
+                        + "set REVISION_ID = ? where JOURNAL_ID = ?";
     }
 
     /**
@@ -691,8 +691,8 @@ public class DatabaseJournal extends AbstractJournal implements DatabaseAware {
 
     /**
      * Set the database type.
-    * @deprecated
-    * This method is deprecated; {@link #getDatabaseType} should be used instead.
+     * @deprecated
+     * This method is deprecated; {@link #getDatabaseType} should be used instead.
      *
      * @param databaseType the database type
      */
@@ -833,6 +833,23 @@ public class DatabaseJournal extends AbstractJournal implements DatabaseAware {
             } catch (SQLException e) {
                 log.warn("Failed to update local revision.", e);
                 throw new JournalException("Failed to update local revision.", e);
+            }
+        }
+
+        @Override
+        public void setToGlobalRevision() throws JournalException {
+            ResultSet rs = null;
+            try {
+                rs = conHelper.exec(selectGlobalStmtSQL, null, false, 0);
+                if (rs.next()) {
+                    localRevision = rs.getLong(1);
+                }
+                conHelper.exec(updateLocalRevisionStmtSQL, localRevision, getId());
+            } catch (SQLException e) {
+                log.warn("Failed to initialize local revision.", e);
+                throw new JournalException("Failed to initialize local revision", e);
+            } finally {
+                DbUtility.close(rs);
             }
         }
 

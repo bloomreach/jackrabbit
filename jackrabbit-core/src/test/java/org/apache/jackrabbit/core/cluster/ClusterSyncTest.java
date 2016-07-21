@@ -195,7 +195,12 @@ public class ClusterSyncTest extends JUnitTest {
             }
             this.revision = revision;
         }
-        
+
+        @Override
+        public void setToGlobalRevision() {
+            // nothing
+        }
+
         public void waitUntilBlocked() throws InterruptedException {
             blockLatch.acquire();
         }

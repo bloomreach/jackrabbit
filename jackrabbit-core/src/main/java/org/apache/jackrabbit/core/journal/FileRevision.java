@@ -47,7 +47,7 @@ public class FileRevision implements InstanceRevision {
      * Cached value.
      */
     protected long value;
-    
+
     /**
      * Flag indicating whether this revision file is closed.
      */
@@ -58,7 +58,7 @@ public class FileRevision implements InstanceRevision {
      *
      * @param file holding global counter
      * @param sync whether to sync the file on every write
-     * 
+     *
      * @throws JournalException if some error occurs
      */
     public FileRevision(File file, boolean sync) throws JournalException {
@@ -118,7 +118,13 @@ public class FileRevision implements InstanceRevision {
             throw new JournalException("I/O error occurred.", e);
         }
     }
-    
+
+    @Override
+    public void setToGlobalRevision() throws JournalException {
+        // there is no separate global
+        return;
+    }
+
     /**
      * Close file revision. Closes underlying random access file.
      */

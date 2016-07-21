@@ -50,4 +50,5 @@ public interface RecordConsumer {
      */
     void setRevision(long revision);
 
+    void setToGlobalRevision();
 }

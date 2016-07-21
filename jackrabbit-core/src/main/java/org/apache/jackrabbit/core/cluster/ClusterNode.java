@@ -197,7 +197,7 @@ public class ClusterNode implements Runnable,
      * Record deserializer.
      */
     private ClusterRecordDeserializer deserializer = new ClusterRecordDeserializer();
-    
+
     /**
      * Flag indicating whether sync is manual.
      */
@@ -259,7 +259,7 @@ public class ClusterNode implements Runnable,
     public long getStopDelay() {
         return stopDelay;
     }
-    
+
     /**
      * Disable periodic background synchronization. Used for testing purposes, only.
      */
@@ -315,9 +315,9 @@ public class ClusterNode implements Runnable,
         }
     }
 
-    /** 
+    /**
      * Synchronize contents from journal.
-     * 
+     *
      * @param startup indicates if the cluster node is syncing on startup 
      *        or does a normal sync.
      * @throws ClusterException if an error occurs
@@ -709,7 +709,7 @@ public class ClusterNode implements Runnable,
                 long updateSize = updateSizeValue != null? (Long)updateSizeValue : 0;
                 updateCount.compareAndSet(Integer.MAX_VALUE, 0);
 
-               	auditLogger.info("[{}] {} {} ({})", new Object[]{updateCount.incrementAndGet(), 
+                auditLogger.info("[{}] {} {} ({})", new Object[]{updateCount.incrementAndGet(),
                         record.getRevision(), path, updateSize});
 
             } catch (JournalException e) {
@@ -876,6 +876,14 @@ public class ClusterNode implements Runnable,
         }
     }
 
+    public void setToGlobalRevision() {
+        try {
+            instanceRevision.setToGlobalRevision();
+        } catch (JournalException e) {
+            log.warn("Unable to set current revision to global revision.", e);
+        }
+    }
+
     //--------------------------------------------------- ClusterRecordProcessor
 
     /**
@@ -919,7 +927,7 @@ public class ClusterNode implements Runnable,
                     + ":" + EventState.getCommonPath(eventStates, null);
 
             updateCount.compareAndSet(Integer.MAX_VALUE, 0);
-           	auditLogger.info("[{}] {} {}", new Object[]{updateCount.incrementAndGet(), 
+            auditLogger.info("[{}] {} {}", new Object[]{updateCount.incrementAndGet(),
                     record.getRevision(), path});
 
             listener.externalUpdate(record.getChanges(), eventStates,
@@ -1001,16 +1009,16 @@ public class ClusterNode implements Runnable,
         Collection coll = record.getCollection();
         try {
             switch (record.getOperation()) {
-            case NodeTypeRecord.REGISTER:
-                nodeTypeListener.externalRegistered(coll);
-                break;
-            case NodeTypeRecord.UNREGISTER:
-                nodeTypeListener.externalUnregistered(coll);
-                break;
-            case NodeTypeRecord.REREGISTER:
-                QNodeTypeDefinition ntd = (QNodeTypeDefinition) coll.iterator().next();
-                nodeTypeListener.externalReregistered(ntd);
-                break;
+                case NodeTypeRecord.REGISTER:
+                    nodeTypeListener.externalRegistered(coll);
+                    break;
+                case NodeTypeRecord.UNREGISTER:
+                    nodeTypeListener.externalUnregistered(coll);
+                    break;
+                case NodeTypeRecord.REREGISTER:
+                    QNodeTypeDefinition ntd = (QNodeTypeDefinition) coll.iterator().next();
+                    nodeTypeListener.externalReregistered(ntd);
+                    break;
             }
         } catch (InvalidNodeTypeDefException e) {
             String msg = "Unable to deliver node type operation: " + e.getMessage();
@@ -1060,7 +1068,7 @@ public class ClusterNode implements Runnable,
     }
 
     public void workspaceCreated(String workspaceName,
-            ClonedInputSource inputSource) {
+                                 ClonedInputSource inputSource) {
         if (status != STARTED) {
             log.info("not started: namespace operation ignored.");
             return;
