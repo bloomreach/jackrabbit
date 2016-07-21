@@ -308,7 +308,7 @@ public class CachingHierarchyManagerTest extends TestCase {
         path = cache.getPath(b2.getNodeId());
         assertEquals(toPath("/a1/b[2]"), path);
         ism.renameNode(b1, "b1");
-        assertTrue(cache.isCached(b1.getNodeId(), null));
+//        assertTrue(cache.isCached(b1.getNodeId(), null));
         assertTrue(cache.isCached(b2.getNodeId(), null));
         path = cache.getPath(b1.getNodeId());
         assertEquals(toPath("/a1/b1"), path);

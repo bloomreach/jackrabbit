@@ -375,8 +375,8 @@ public class NodeState extends ItemState {
             if (oldEntry.getName().equals(newName)) {
                 notifyNodesReplaced();
             } else {
-                notifyNodeAdded(newEntry);
                 notifyNodeRemoved(oldEntry);
+                notifyNodeAdded(newEntry);
             }
             return true;
         }
