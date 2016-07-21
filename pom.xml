@@ -27,7 +27,7 @@
   <parent>
     <groupId>org.apache.jackrabbit</groupId>
     <artifactId>jackrabbit-parent</artifactId>
-    <version>2.10.1</version>
+    <version>2.10.1-h13-SNAPSHOT</version>
     <relativePath>jackrabbit-parent/pom.xml</relativePath>
   </parent>
 
@@ -38,26 +38,26 @@
   <modules>
     <module>jackrabbit-parent</module>
     <module>jackrabbit-api</module>
-    <module>jackrabbit-jcr-commons</module>
+    <!--<module>jackrabbit-jcr-commons</module>-->
     <module>jackrabbit-jcr-tests</module>
     <module>jackrabbit-data</module>
-    <module>jackrabbit-aws-ext</module>
+    <!--<module>jackrabbit-aws-ext</module>-->
     <module>jackrabbit-core</module>
-    <module>jackrabbit-webdav</module>
-    <module>jackrabbit-jcr-server</module>
-    <module>jackrabbit-jcr-rmi</module>
-    <module>jackrabbit-jcr-servlet</module>
-    <module>jackrabbit-webapp</module>
-    <module>jackrabbit-jca</module>
-    <module>jackrabbit-spi</module>
+    <!--<module>jackrabbit-webdav</module>-->
+    <!--<module>jackrabbit-jcr-server</module>-->
+    <!--<module>jackrabbit-jcr-rmi</module>-->
+    <!--<module>jackrabbit-jcr-servlet</module>-->
+    <!--<module>jackrabbit-webapp</module>-->
+    <!--<module>jackrabbit-jca</module>-->
+    <!--<module>jackrabbit-spi</module>-->
     <module>jackrabbit-spi-commons</module>
-    <module>jackrabbit-jcr2spi</module>
-    <module>jackrabbit-spi2jcr</module>
-    <module>jackrabbit-spi2dav</module>
-    <module>jackrabbit-jcr2dav</module>
-    <module>jackrabbit-jcr-client</module>
-    <module>jackrabbit-bundle</module>
-    <module>jackrabbit-standalone</module>
+    <!--<module>jackrabbit-jcr2spi</module>-->
+    <!--<module>jackrabbit-spi2jcr</module>-->
+    <!--<module>jackrabbit-spi2dav</module>-->
+    <!--<module>jackrabbit-jcr2dav</module>-->
+    <!--<module>jackrabbit-jcr-client</module>-->
+    <!--<module>jackrabbit-bundle</module>-->
+    <!--<module>jackrabbit-standalone</module>-->
   </modules>
 
   <scm>

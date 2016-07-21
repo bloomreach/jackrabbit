@@ -26,7 +26,7 @@
   <parent>
     <groupId>org.apache.jackrabbit</groupId>
     <artifactId>jackrabbit-parent</artifactId>
-    <version>2.10.1</version>
+    <version>2.10.1-h13-SNAPSHOT</version>
     <relativePath>../jackrabbit-parent/pom.xml</relativePath>
   </parent>
   <artifactId>jackrabbit-core</artifactId>
@@ -103,17 +103,13 @@ org.apache.jackrabbit.core.ConcurrentImportTest
 org.apache.jackrabbit.core.xml.DocumentViewTest#testMultiValue
 org.apache.jackrabbit.core.NodeImplTest#testReferentialIntegrityCorruptionGetPath
 org.apache.jackrabbit.core.integration.ConcurrentQueryTest#testConcurrentQueryWithDeletes
-org.apache.jackrabbit.test.api.ShareableNodeTest#testGetName
-org.apache.jackrabbit.test.api.ShareableNodeTest#testGetNode
-org.apache.jackrabbit.test.api.ShareableNodeTest#testGetNodes
-org.apache.jackrabbit.test.api.ShareableNodeTest#testGetNodesByPattern
-org.apache.jackrabbit.test.api.ShareableNodeTest#testMoveShareableNode<!--JCR-3381-->
-org.apache.jackrabbit.test.api.ShareableNodeTest#testTransientMoveShareableNode<!--JCR-3381-->
+org.apache.jackrabbit.test.api.ShareableNodeTest
 org.apache.jackrabbit.test.api.lock.OpenScopedLockTest#testLockExpiration
 org.apache.jackrabbit.test.api.lock.SessionScopedLockTest#testLockExpiration
 org.apache.jackrabbit.test.api.observation.NodeReorderTest#testNodeReorderMove
 org.apache.jackrabbit.core.data.ConcurrentGcTest#testDatabases
 org.apache.jackrabbit.core.data.GarbageCollectorTest#testCloseSessionWhileRunningGc
+org.apache.jackrabbit.core.query.lucene.DecimalConvertTest#testRandomized <!-- JCR-3834 -->
 org.apache.jackrabbit.core.ReplacePropertyWhileOthersReadTest <!-- JCR-3835 -->
               </value>
             </property>
@@ -239,12 +235,12 @@ org.apache.jackrabbit.core.ReplacePropertyWhileOthersReadTest <!-- JCR-3835 -->
     <dependency>
       <groupId>org.apache.jackrabbit</groupId>
       <artifactId>jackrabbit-api</artifactId>
-      <version>${project.version}</version>
+      <version>${jackrabbit.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.jackrabbit</groupId>
       <artifactId>jackrabbit-jcr-commons</artifactId>
-      <version>${project.version}</version>
+      <version>${jackrabbit.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.jackrabbit</groupId>
@@ -266,13 +262,13 @@ org.apache.jackrabbit.core.ReplacePropertyWhileOthersReadTest <!-- JCR-3835 -->
     <dependency>
       <groupId>org.apache.jackrabbit</groupId>
       <artifactId>jackrabbit-spi</artifactId>
-      <version>${project.version}</version>
+      <version>${jackrabbit.version}</version>
       <classifier />
     </dependency>
       <dependency>
       <groupId>org.apache.jackrabbit</groupId>
       <artifactId>jackrabbit-spi</artifactId>
-      <version>${project.version}</version>
+      <version>${jackrabbit.version}</version>
       <classifier>tests</classifier>
       <scope>test</scope>
     </dependency>
