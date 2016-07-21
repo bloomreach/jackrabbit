@@ -691,6 +691,10 @@ public class SearchIndex extends AbstractQueryHandler {
         // based on removed ids get affected aggregate root nodes
         retrieveAggregateRoot(removedIds, aggregateRoots);
 
+        // again remove any aggregateRoot nodes that are new
+        // and therefore already up-to-date
+        aggregateRoots.keySet().removeAll(addedIds);
+
         // update aggregates if there are any affected
         if (!aggregateRoots.isEmpty()) {
             Collection<Document> modified =
