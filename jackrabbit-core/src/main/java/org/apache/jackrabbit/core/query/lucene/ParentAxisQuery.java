@@ -22,12 +22,15 @@ import org.apache.jackrabbit.core.query.lucene.hits.ScorerHits;
 import org.apache.jackrabbit.spi.Name;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.Term;
+import org.apache.lucene.search.DocIdSetIterator;
 import org.apache.lucene.search.Explanation;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.Scorer;
 import org.apache.lucene.search.Searcher;
 import org.apache.lucene.search.Similarity;
 import org.apache.lucene.search.Weight;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.BitSet;
@@ -40,6 +43,8 @@ import java.util.Set;
  */
 @SuppressWarnings("serial")
 class ParentAxisQuery extends Query {
+
+    private static final Logger log = LoggerFactory.getLogger(ParentAxisQuery.class);
 
     /**
      * The context query
@@ -251,6 +256,10 @@ class ParentAxisQuery extends Query {
          */
         private Float firstScore;
 
+        private DocIdSetIterator filterIterator;
+
+        private boolean filterIteratorExhausted;
+
         /**
          * Creates a new <code>ParentAxisScorer</code>.
          *
@@ -267,6 +276,13 @@ class ParentAxisQuery extends Query {
             this.reader = reader;
             this.searcher = searcher;
             this.hResolver = resolver;
+            if (searcher instanceof JackrabbitIndexSearcher && ((JackrabbitIndexSearcher)searcher).getFilter() != null) {
+                try {
+                    filterIterator = ((JackrabbitIndexSearcher)searcher).getFilter().getDocIdSet(reader).iterator();
+                } catch (IOException e) {
+                    log.warn("IOException while getting filter : ", e.toString());
+                }
+            }
         }
 
         @Override
@@ -327,6 +343,26 @@ class ParentAxisQuery extends Query {
 
                         @Override
                         protected void collect(int doc, float score) {
+                            if (filterIterator != null) {
+                                if (filterIteratorExhausted) {
+                                    // filter does not have any more allowed doc
+                                    return;
+                                }
+                                try {
+                                    final int advance = filterIterator.advance(doc);
+                                    if (advance == NO_MORE_DOCS) {
+                                        // filter exhausted: We should not invoke #advance any more
+                                        filterIteratorExhausted = true;
+                                    }
+                                    if (advance != doc) {
+                                        // doc is not readable by filter : Don't return the possibly readable parent!
+                                        return;
+                                    }
+                                } catch (IOException e) {
+                                    log.warn("Exception while using filter : {}", e.toString());
+                                    return;
+                                }
+                            }
                             try {
                                 docs = hResolver.getParents(doc, docs);
                                 if (docs.length == 1) {
