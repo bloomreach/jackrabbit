@@ -40,6 +40,12 @@ public class MemoryRevision implements InstanceRevision {
         this.revision = value;
     }
 
+    @Override
+    public void setToGlobalRevision() throws JournalException {
+        // there is no separate global
+        return;
+    }
+
     /**
      * {@inheritDoc}
      */

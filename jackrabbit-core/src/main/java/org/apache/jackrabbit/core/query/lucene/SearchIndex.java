@@ -92,7 +92,6 @@ import org.apache.lucene.document.Field;
 import org.apache.lucene.document.Fieldable;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.MultiReader;
-import org.apache.lucene.index.Payload;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.index.TermDocs;
 import org.apache.lucene.search.IndexSearcher;
@@ -579,8 +578,18 @@ public class SearchIndex extends AbstractQueryHandler {
             } else {
                 rootPath = ROOT_PATH;
             }
+
+            final ClusterNode clusterNode = getContext().getClusterNode();
+            if (clusterNode != null ) {
+                // it is safe to set the local revision equal to the global revision
+                // because there is an entire index recreation. If we don't do this, after the index creation,
+                // all documents after the local revision get again removed from the index and then later added again
+                clusterNode.setToGlobalRevision();
+            }
+
             index.createInitialIndex(context.getItemStateManager(),
                     context.getRootId(), rootPath);
+
             checkPendingJournalChanges(context);
         }
         if (consistencyCheckEnabled
