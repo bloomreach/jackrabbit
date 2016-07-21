@@ -16,6 +16,10 @@
  */
 package org.apache.jackrabbit.core;
 
+import org.apache.jackrabbit.core.observation.EventStateCollectionFactory;
+import org.apache.jackrabbit.core.state.ItemStateCacheFactory;
+import org.apache.jackrabbit.core.state.LocalItemStateManager;
+import org.apache.jackrabbit.core.state.SharedItemStateManager;
 import static org.apache.jackrabbit.core.ItemValidator.CHECK_CHECKED_OUT;
 import static org.apache.jackrabbit.core.ItemValidator.CHECK_CONSTRAINTS;
 import static org.apache.jackrabbit.core.ItemValidator.CHECK_HOLD;
@@ -1330,4 +1334,7 @@ public class SessionImpl extends AbstractSession
         }
     }
 
+    public LocalItemStateManager createItemStateManager(RepositoryContext repositoryContext, WorkspaceImpl workspace, SharedItemStateManager sharedStateMgr, EventStateCollectionFactory factory, String attribute, ItemStateCacheFactory cacheFactory) {
+        return LocalItemStateManager.createInstance(sharedStateMgr, factory, cacheFactory);
+    }
 }
