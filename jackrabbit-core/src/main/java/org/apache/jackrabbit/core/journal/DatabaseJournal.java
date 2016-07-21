@@ -829,6 +829,23 @@ public class DatabaseJournal extends AbstractJournal implements DatabaseAware {
             }
         }
 
+        @Override
+        public void setToGlobalRevision() throws JournalException {
+            ResultSet rs = null;
+            try {
+                rs = conHelper.exec(selectGlobalStmtSQL, null, false, 0);
+                if (rs.next()) {
+                    localRevision = rs.getLong(1);
+                }
+                conHelper.exec(updateLocalRevisionStmtSQL, localRevision, getId());
+            } catch (SQLException e) {
+                log.warn("Failed to initialize local revision.", e);
+                throw new JournalException("Failed to initialize local revision", e);
+            } finally {
+                DbUtility.close(rs);
+            }
+        }
+
         public void close() {
             // nothing to do
         }
