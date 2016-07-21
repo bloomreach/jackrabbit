@@ -16,6 +16,7 @@
  */
 package org.apache.jackrabbit.spi.commons.name;
 
+import javax.jcr.RepositoryException;
 import org.apache.jackrabbit.spi.Name;
 import org.apache.jackrabbit.spi.Path;
 import org.apache.jackrabbit.spi.PathFactory;
@@ -89,9 +90,9 @@ public final class PathBuilder {
      */
     public void addRoot() {
         if (path != null) {
-            path = RootPath.ROOT_PATH.resolve(path);
+            path = ((Path)factory.getRootElement()).resolve(path);
         } else {
-            path = RootPath.ROOT_PATH;
+            path = (Path) factory.getRootElement();
         }
     }
 
@@ -172,7 +173,11 @@ public final class PathBuilder {
      * @param index
      */
     public void addLast(Name name, int index) {
-        path = new NamePath(path, name, index);
+        try {
+            path = factory.create(path, name, index, false);
+        } catch(RepositoryException ex) {
+            // because normalize argument to create method is false, will not occur
+        }
     }
 
     /**
