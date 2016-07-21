@@ -38,7 +38,7 @@ public class LocalItemStateManager
      * cache of weak references to ItemState objects issued by this
      * ItemStateManager
      */
-    private final ItemStateCache cache;
+    protected final ItemStateCache cache;
 
     /**
      * Shared item state manager
