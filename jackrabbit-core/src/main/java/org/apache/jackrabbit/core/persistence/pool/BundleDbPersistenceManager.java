@@ -152,6 +152,7 @@ public class BundleDbPersistenceManager
     protected String nodeReferenceUpdateSQL;
     protected String nodeReferenceSelectSQL;
     protected String nodeReferenceDeleteSQL;
+    protected String nodeReferenceSelectAllSQL;
 
     /** file system where BLOB data is stored */
     protected CloseableBLOBStore blobStore;
@@ -1016,6 +1017,41 @@ public class BundleDbPersistenceManager
         }
     }
 
+    public synchronized List<NodeReferences> getAllNodeReference() throws ItemStateException {
+        if (!initialized) {
+            throw new IllegalStateException("not initialized");
+        }
+        List<NodeReferences> result = new ArrayList<NodeReferences>();
+        ResultSet rs = null;
+        InputStream in = null;
+        try {
+            rs = conHelper.exec(nodeReferenceSelectAllSQL, new Object[] {}, false, 0);
+            while (rs.next()) {
+                NodeId nodeId;
+                if (getStorageModel() == SM_BINARY_KEYS) {
+                    nodeId = new NodeId(rs.getBytes(1));
+                } else {
+                    long high = rs.getLong(1);
+                    long low = rs.getLong(2);
+                    nodeId = new NodeId(high, low);
+                }
+                NodeReferences refs = new NodeReferences(nodeId);
+                in = rs.getBinaryStream(getStorageModel() == SM_BINARY_KEYS ? 2 : 3);
+                Serializer.deserialize(refs, in);
+                result.add(refs);
+                IOUtils.closeQuietly(in);
+            }
+        } catch (Exception e) {
+            String msg = "failed to read references";
+            log.error(msg, e);
+            throw new ItemStateException(msg, e);
+        } finally {
+            IOUtils.closeQuietly(in);
+            DbUtility.close(rs);
+        }
+        return result;
+    }
+
     /**
      * {@inheritDoc}
      *
@@ -1108,6 +1144,7 @@ public class BundleDbPersistenceManager
      */
     protected void buildSQLStatements() {
         // prepare statements
+        nodeReferenceSelectAllSQL = "select * from " + schemaObjectPrefix + "REFS";
         if (getStorageModel() == SM_BINARY_KEYS) {
             bundleInsertSQL = "insert into " + schemaObjectPrefix + "BUNDLE (BUNDLE_DATA, NODE_ID) values (?, ?)";
             bundleUpdateSQL = "update " + schemaObjectPrefix + "BUNDLE set BUNDLE_DATA = ? where NODE_ID = ?";
