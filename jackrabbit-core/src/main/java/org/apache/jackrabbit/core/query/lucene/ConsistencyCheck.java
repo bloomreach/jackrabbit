@@ -21,6 +21,9 @@ import org.apache.jackrabbit.core.HierarchyManager;
 import org.apache.jackrabbit.core.RepositoryImpl;
 import org.apache.jackrabbit.core.cluster.ClusterException;
 import org.apache.jackrabbit.core.cluster.ClusterNode;
+import org.apache.jackrabbit.core.nodetype.EffectiveNodeType;
+import org.apache.jackrabbit.core.nodetype.NodeTypeConflictException;
+import org.apache.jackrabbit.core.nodetype.NodeTypeRegistry;
 import org.apache.jackrabbit.core.persistence.IterablePersistenceManager;
 import org.apache.jackrabbit.core.persistence.PersistenceManager;
 import org.apache.jackrabbit.core.state.ItemState;
@@ -30,6 +33,7 @@ import org.apache.jackrabbit.core.state.NodeState;
 import org.apache.jackrabbit.core.state.ItemStateException;
 import org.apache.jackrabbit.core.state.ChildNodeEntry;
 import org.apache.jackrabbit.core.id.NodeId;
+import org.apache.jackrabbit.spi.Name;
 import org.apache.jackrabbit.spi.Path;
 import org.apache.jackrabbit.spi.commons.conversion.MalformedPathException;
 import org.apache.jackrabbit.spi.commons.name.NameConstants;
@@ -40,8 +44,10 @@ import org.slf4j.LoggerFactory;
 
 import javax.jcr.ItemNotFoundException;
 import javax.jcr.RepositoryException;
+import javax.jcr.nodetype.NoSuchNodeTypeException;
 
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -108,6 +114,8 @@ public class ConsistencyCheck {
      */
     private final Set<Path> ignoredPaths = new HashSet<Path>();
 
+    private Name skipIndexTypeName;
+
     /**
      * List of all errors.
      */
@@ -150,6 +158,17 @@ public class ConsistencyCheck {
         final PersistenceManager pm = handler.getContext().getPersistenceManager();
         if (pm instanceof IterablePersistenceManager) {
             this.pm = (IterablePersistenceManager) pm;
+        }
+
+        try {
+            final IndexingConfiguration indexingConfig = handler.getIndexingConfig();
+            skipIndexTypeName = (Name) indexingConfig.getClass().getMethod("getSkipIndexName").invoke(indexingConfig);
+        } catch (IllegalAccessException e) {
+            log.error("Failed to determine skip index type name", e);
+        } catch (InvocationTargetException e) {
+            log.error("Failed to determine skip index type name", e);
+        } catch (NoSuchMethodException e) {
+            log.error("Failed to determine skip index type name", e);
         }
     }
 
@@ -417,7 +436,49 @@ public class ConsistencyCheck {
                     return true;
                 }
             }
+            if (skipIndexTypeName != null) {
+                NodeState nodeState = (NodeState) handler.getContext().getItemStateManager().getItemState(id);
+                while (nodeState != null) {
+                    if (isNodeType(nodeState, skipIndexTypeName)) {
+                        return true;
+                    }
+                    final NodeId parentId = nodeState.getParentId();
+                    if (parentId == null) {
+                        nodeState = null;
+                    } else {
+                        nodeState = (NodeState) handler.getContext().getItemStateManager().getItemState(parentId);
+                    }
+                }
+            }
         } catch (RepositoryException ignored) {
+        } catch (ItemStateException ignored) {
+        }
+        return false;
+    }
+
+    private boolean isNodeType(final NodeState nodeState, final Name nodeType) {
+        if (nodeState == null) {
+            return false;
+        }
+        // first do trivial checks without using type hierarchy
+        Name primary = nodeState.getNodeTypeName();
+        if (nodeType.equals(primary)) {
+            return true;
+        }
+        Set<Name> mixins = nodeState.getMixinTypeNames();
+        if (mixins.contains(nodeType)) {
+            return true;
+        }
+
+        // check effective node type
+        try {
+            NodeTypeRegistry registry = handler.getContext().getNodeTypeRegistry();
+            EffectiveNodeType type = registry.getEffectiveNodeType(primary, mixins);
+            return type.includesNodeType(nodeType);
+        } catch (NodeTypeConflictException e) {
+            log.warn("Failed to build effective node type for node {}", nodeState.getId());
+        } catch (NoSuchNodeTypeException e) {
+            log.warn("Failed to build effective node type for node {}", nodeState.getId());
         }
         return false;
     }
