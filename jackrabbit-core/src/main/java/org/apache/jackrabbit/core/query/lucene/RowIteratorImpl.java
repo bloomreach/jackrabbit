@@ -20,13 +20,14 @@ import org.apache.jackrabbit.core.NodeImpl;
 import org.apache.jackrabbit.core.id.NodeId;
 import org.apache.jackrabbit.core.ItemManager;
 import org.apache.jackrabbit.core.HierarchyManager;
+import org.apache.jackrabbit.core.session.SessionContext;
+import org.apache.jackrabbit.core.session.SessionOperation;
 import org.apache.jackrabbit.spi.commons.conversion.NameException;
 import org.apache.jackrabbit.spi.Name;
 import org.apache.jackrabbit.spi.QValueFactory;
 import org.apache.jackrabbit.spi.QValue;
 import org.apache.jackrabbit.spi.commons.name.NameConstants;
 import org.apache.jackrabbit.spi.commons.name.NameFactoryImpl;
-import org.apache.jackrabbit.spi.commons.conversion.NamePathResolver;
 import org.apache.jackrabbit.spi.commons.value.QValueFactoryImpl;
 import org.apache.jackrabbit.spi.commons.value.ValueFactoryQImpl;
 import org.apache.jackrabbit.spi.commons.query.qom.ColumnImpl;
@@ -109,7 +110,7 @@ class RowIteratorImpl implements RowIterator {
     /**
      * The <code>NamePathResolver</code> of the user <code>Session</code>.
      */
-    private final NamePathResolver resolver;
+    private final SessionContext resolver;
 
     /**
      * The excerpt provider or <code>null</code> if none is available.
@@ -125,6 +126,22 @@ class RowIteratorImpl implements RowIterator {
      * A value factory for the session that executes the query.
      */
     private final ValueFactoryQImpl valueFactory;
+
+
+
+    /** Number of invalid nodes */
+    protected int invalid = 0;
+
+    /** Reference to the next node instance */
+    private NodeImpl next;
+
+    /** Reference to the next scoreNodes instance */
+    private ScoreNode[] nextScoreNodes;
+    /**
+     * Whether this iterator had been initialized.
+     */
+    private boolean initialized;
+
 
     /**
      * Creates a new <code>RowIteratorImpl</code> that iterates over the result
@@ -152,7 +169,7 @@ class RowIteratorImpl implements RowIterator {
                     Name[] selectorNames,
                     ItemManager itemMgr,
                     HierarchyManager hmgr,
-                    NamePathResolver resolver,
+                    SessionContext resolver,
                     ValueFactory valueFactory,
                     ExcerptProvider exProvider,
                     SpellSuggestion spellSuggestion)
@@ -181,7 +198,13 @@ class RowIteratorImpl implements RowIterator {
      *                                <code>Row</code>s.
      */
     public Row nextRow() throws NoSuchElementException {
-        return new RowImpl(scoreNodes.nextScoreNodes());
+        initialize();
+        if (next == null) {
+            throw new NoSuchElementException();
+        }
+        final RowImpl row = new RowImpl(nextScoreNodes);
+        fetchNext();
+        return row;
     }
 
     /**
@@ -192,7 +215,11 @@ class RowIteratorImpl implements RowIterator {
      *                                <code>Row</code> in this iterator.
      */
     public void skip(long skipNum) throws NoSuchElementException {
-        scoreNodes.skip(skipNum);
+        initialize();
+        if (skipNum > 0) {
+            scoreNodes.skip(skipNum - 1);
+            fetchNext();
+        }
     }
 
     /**
@@ -201,7 +228,12 @@ class RowIteratorImpl implements RowIterator {
      * @return the number of <code>Row</code>s in this iterator.
      */
     public long getSize() {
-        return scoreNodes.getSize();
+        long size = scoreNodes.getSize();
+        if (size == -1) {
+            return size;
+        } else {
+            return size - invalid;
+        }
     }
 
     /**
@@ -215,7 +247,14 @@ class RowIteratorImpl implements RowIterator {
      * @return the current position withing this iterator.
      */
     public long getPosition() {
-        return scoreNodes.getPosition();
+        initialize();
+        long position = scoreNodes.getPosition() - invalid;
+        // scoreNode.getPosition() is one ahead
+        // if there is a prefetched node
+        if (next != null) {
+            position--;
+        }
+        return position;
     }
 
     /**
@@ -233,7 +272,8 @@ class RowIteratorImpl implements RowIterator {
      * @return <code>true</code> if the iterator has more elements.
      */
     public boolean hasNext() {
-        return scoreNodes.hasNext();
+        initialize();
+        return next != null;
     }
 
     /**
@@ -244,6 +284,52 @@ class RowIteratorImpl implements RowIterator {
      */
     public Object next() throws NoSuchElementException {
         return nextRow();
+    }
+
+
+    /**
+     * Clears {@link #next} and tries to fetch the next Node instance.
+     * When this method returns {@link #next} refers to the next available
+     * node instance in this iterator. If {@link #next} is null when this
+     * method returns, then there are no more valid element in this iterator.
+     */
+    protected void fetchNext() {
+        try {
+            next = null; // reset
+            resolver.getSessionState().perform(new FetchNext());
+        } catch (RepositoryException e) {
+            log.warn("Failed to fetch next node", e);
+        }
+    }
+
+    private class FetchNext implements SessionOperation<Object> {
+
+        public Object perform(SessionContext context) {
+
+            ItemManager itemMgr = context.getItemManager();
+            while (next == null && scoreNodes.hasNext()) {
+                nextScoreNodes = scoreNodes.nextScoreNodes();
+                try {
+                    next = (NodeImpl) itemMgr.getItem(
+                            nextScoreNodes[0].getNodeId());
+                } catch (RepositoryException e) {
+                    log.warn("Failed to retrieve query result node "
+                            + nextScoreNodes[0].getNodeId(), e);
+                    // try next
+                    invalid++;
+                }
+            }
+
+            return this;
+        }
+
+    }
+
+    protected void initialize() {
+        if (!initialized) {
+            fetchNext();
+            initialized = true;
+        }
     }
 
     //---------------------< class RowImpl >------------------------------------
