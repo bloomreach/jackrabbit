@@ -876,6 +876,14 @@ public class ClusterNode implements Runnable,
         }
     }
 
+    public void setToGlobalRevision() {
+        try {
+            instanceRevision.setToGlobalRevision();
+        } catch (JournalException e) {
+            log.warn("Unable to set current revision to global revision.", e);
+        }
+    }
+
     //--------------------------------------------------- ClusterRecordProcessor
 
     /**
