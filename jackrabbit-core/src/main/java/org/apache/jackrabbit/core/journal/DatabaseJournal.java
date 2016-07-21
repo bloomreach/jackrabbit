@@ -790,6 +790,13 @@ public class DatabaseJournal extends AbstractJournal implements DatabaseAware {
 
                 // Insert the given revision in the database
                 if (!exists) {
+                    if (revision == 0l) {
+                        // cluster node is new, start revision is current journal head
+                        rs = conHelper.exec(selectGlobalStmtSQL, null, false, 0);
+                        if (rs.next()) {
+                            revision = rs.getLong(1);
+                        }
+                    }
                     conHelper.exec(insertLocalRevisionStmtSQL, revision, getId());
                 }
 

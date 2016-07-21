@@ -37,6 +37,8 @@ import java.util.concurrent.TimeUnit;
 import javax.jcr.AccessDeniedException;
 import javax.jcr.Credentials;
 import javax.jcr.LoginException;
+import javax.jcr.NamespaceException;
+import javax.jcr.NamespaceRegistry;
 import javax.jcr.NoSuchWorkspaceException;
 import javax.jcr.PropertyType;
 import javax.jcr.Repository;
@@ -240,6 +242,32 @@ public class RepositoryImpl extends AbstractRepository
      */
     private WorkspaceEventChannel createWorkspaceEventChannel;
 
+    private class DelegatingClusterContext extends ExternalEventListener implements ClusterContext {
+
+        private NamespaceResolver namespaceResolver;
+
+        private final NamespaceResolver delegatingNamespaceResolver = new NamespaceResolver() {
+            @Override
+            public String getURI(final String prefix) throws NamespaceException {
+                return namespaceResolver != null ? namespaceResolver.getURI(prefix) : null;
+            }
+
+            @Override
+            public String getPrefix(final String uri) throws NamespaceException {
+                return namespaceResolver != null ? namespaceResolver.getPrefix(uri) : null;
+            }
+        };
+
+        public void setNamespaceRegistry(NamespaceRegistry namespaceRegistry) {
+            namespaceResolver = new RegistryNamespaceResolver(namespaceRegistry);
+        }
+
+        @Override
+        public NamespaceResolver getNamespaceResolver() {
+            return delegatingNamespaceResolver;
+        }
+    }
+
     /**
      * Protected constructor.
      *
@@ -270,6 +298,20 @@ public class RepositoryImpl extends AbstractRepository
             initRepositoryDescriptors();
 
             // create registries
+            // initialize optional clustering before setting up any other
+            // external event source that a cluster node will be interested in
+            ClusterNode clusterNode = null;
+            DelegatingClusterContext clusterContext = null;
+            if (repConfig.getClusterConfig() != null) {
+                clusterNode = new ClusterNode();
+                clusterContext = new DelegatingClusterContext();
+                try {
+                    clusterNode.init(clusterContext);
+                }
+                catch (Exception e) {
+                    throw new RepositoryException(e);
+                }
+            }
             context.setNamespaceRegistry(createNamespaceRegistry());
             context.setNodeTypeRegistry(createNodeTypeRegistry());
             context.setPrivilegeRegistry(new PrivilegeRegistry(context.getNamespaceRegistry(), context.getFileSystem()));
@@ -295,11 +337,8 @@ public class RepositoryImpl extends AbstractRepository
                 wspInfos.put(config.getName(), info);
             }
 
-            // initialize optional clustering before setting up any other
-            // external event source that a cluster node will be interested in
-            ClusterNode clusterNode = null;
-            if (repConfig.getClusterConfig() != null) {
-                clusterNode = createClusterNode();
+            if (clusterNode != null) {
+                clusterContext.setNamespaceRegistry(context.getNamespaceRegistry());
                 context.setClusterNode(clusterNode);
                 context.getNamespaceRegistry().setEventChannel(clusterNode);
                 context.getNodeTypeRegistry().setEventChannel(clusterNode);
