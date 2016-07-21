@@ -24,8 +24,6 @@ import java.io.OutputStreamWriter;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
 
 import javax.jcr.ItemNotFoundException;
 import javax.jcr.PropertyType;
@@ -99,11 +97,6 @@ public class LockManagerImpl
     private XAReentrantLock lockPropertiesLock = new XAReentrantLock();
 
     /**
-     * The periodically invoked lock timeout handler.
-     */
-    private final ScheduledFuture<?> timeoutHandler;
-
-    /**
      * System session
      */
     private final SessionImpl sysSession;
@@ -150,54 +143,32 @@ public class LockManagerImpl
             throw new RepositoryException("I/O error while reading locks from '"
                     + locksFile.getPath() + "'", e);
         }
+    }
 
-        timeoutHandler = executor.scheduleWithFixedDelay(
-                new TimeoutHandler(), 1, 1, TimeUnit.SECONDS);
+    private boolean unlockIfExpired(final LockInfo info) {
+        if (info.isLive() && info.isExpired()) {
+            final NodeId id = info.getId();
+            SessionImpl holder = info.getLockHolder();
+            if (holder == null) {
+                info.setLockHolder(sysSession);
+                holder = sysSession;
+            }
+            try {
+                log.debug("Try to unlock expired lock. NodeId {}", id);
+                unlock(holder.getNodeById(id));
+                return true;
+            } catch (RepositoryException e) {
+                log.warn("Unable to expire the lock. NodeId " + id, e);
+            }
+        }
+        return false;
     }
 
     /**
      * Close this lock manager. Writes back all changes.
      */
     public void close() {
-        timeoutHandler.cancel(false);
         save();
-    }
-
-    /**
-     * Periodically (at one second delay) invoked timeout handler. Traverses
-     * all locks and unlocks those that have expired.
-     *
-     * @see <a href="https://issues.apache.org/jira/browse/JCR-1590">JCR-1590</a>:
-     *      JSR 283: Locking
-     */
-    private class TimeoutHandler implements Runnable {
-        private final TimeoutHandlerVisitor visitor = new TimeoutHandlerVisitor();
-
-        public void run() {
-            lockMap.traverse(visitor, false);
-        }
-    }
-
-    private class TimeoutHandlerVisitor implements
-            PathMap.ElementVisitor<LockInfo> {
-        public void elementVisited(PathMap.Element<LockInfo> element) {
-            LockInfo info = element.get();
-            if (info != null && info.isLive() && info.isExpired()) {
-                NodeId id = info.getId();
-                SessionImpl holder = info.getLockHolder();
-                if (holder == null) {
-                    info.setLockHolder(sysSession);
-                    holder = sysSession;
-                }
-                try {
-                    // FIXME: This session access is not thread-safe!
-                    log.debug("Try to unlock expired lock. NodeId {}", id);
-                    unlock(holder.getNodeById(id));
-                } catch (RepositoryException e) {
-                    log.warn("Unable to expire the lock. NodeId " + id, e);
-                }
-            }
-        }
     }
 
     /**
@@ -205,10 +176,8 @@ public class LockManagerImpl
      */
     private void load() throws FileSystemException {
         BufferedReader reader = null;
-
         try {
-            reader = new BufferedReader(
-                    new InputStreamReader(locksFile.getInputStream()));
+            reader = new BufferedReader(new InputStreamReader(locksFile.getInputStream()));
             while (true) {
                 String s = reader.readLine();
                 if (s == null || s.equals("")) {
@@ -356,7 +325,7 @@ public class LockManagerImpl
             PathMap.Element<LockInfo> element = lockMap.map(path, false);
 
             LockInfo other = element.get();
-            if (other != null) {
+            if (other != null && !unlockIfExpired(other)) {
                 if (element.hasPath(path)) {
                     other.throwLockException(
                             "Node already locked: " + node, session);
@@ -365,9 +334,18 @@ public class LockManagerImpl
                             "Parent node has a deep lock: " + node, session);
                 }
             }
-            if (info.isDeep() && element.hasPath(path)
-                    && element.getChildrenCount() > 0) {
-                info.throwLockException("Some child node is locked", session);
+            if (info.isDeep() && element.hasPath(path) && element.getChildrenCount() > 0) {
+                boolean childLocked = false;
+                for (PathMap.Element<LockInfo> child : element.getChildren()) {
+                    final LockInfo childLockInfo = child.get();
+                    if (childLockInfo != null && !unlockIfExpired(childLockInfo)) {
+                        childLocked = true;
+                        break;
+                    }
+                }
+                if (childLocked) {
+                    info.throwLockException("Some child node is locked", session);
+                }
             }
 
             // create lock token
@@ -455,7 +433,7 @@ public class LockManagerImpl
         lockMap.traverse(new PathMap.ElementVisitor<LockInfo>() {
             public void elementVisited(PathMap.Element<LockInfo> element) {
                 LockInfo info = element.get();
-                if (info.isLive() && info.isLockHolder(session)) {
+                if (info.isLive() && !info.isExpired() && info.isLockHolder(session)) {
                     infos.add(info);
                 }
             }
@@ -506,7 +484,7 @@ public class LockManagerImpl
         try {
             PathMap.Element<LockInfo> element = lockMap.map(path, false);
             LockInfo info = element.get();
-            if (info != null) {
+            if (info != null && !unlockIfExpired(info)) {
                 if (element.hasPath(path) || info.isDeep()) {
                     return info;
                 }
@@ -549,7 +527,7 @@ public class LockManagerImpl
 
             PathMap.Element<LockInfo> element = lockMap.map(path, false);
             LockInfo info = element.get();
-            if (info != null && (element.hasPath(path) || info.isDeep())) {
+            if (info != null && !unlockIfExpired(info) && (element.hasPath(path) || info.isDeep())) {
                 NodeImpl lockHolder = (NodeImpl)
                     session.getItemManager().getItem(info.getId());
                 return new LockImpl(info, lockHolder);
@@ -610,7 +588,8 @@ public class LockManagerImpl
             if (element == null) {
                 return false;
             }
-            return element.get() != null;
+            final LockInfo lockInfo = element.get();
+            return lockInfo != null && !unlockIfExpired(lockInfo);
         } catch (ItemNotFoundException e) {
             return false;
         } finally {
@@ -631,6 +610,9 @@ public class LockManagerImpl
             PathMap.Element<LockInfo> element = lockMap.map(path, false);
             LockInfo info = element.get();
             if (info == null) {
+                return false;
+            }
+            if (unlockIfExpired(info)) {
                 return false;
             }
             if (element.hasPath(path)) {
@@ -685,12 +667,10 @@ public class LockManagerImpl
      * @param info info to check
      * @param session session
      * @throws LockException if write access to the specified path is not allowed
-     * @throws RepositoryException if some other error occurs
      */
     protected void checkLock(LockInfo info, Session session)
-            throws LockException, RepositoryException {
-
-        if (!info.isLockHolder(session)) {
+            throws LockException {
+        if (!unlockIfExpired(info) && !info.isLockHolder(session)) {
             throw new LockException("Node locked.");
         }
     }
@@ -754,7 +734,7 @@ public class LockManagerImpl
             PathMap.Element<LockInfo> element = lockMap.map(path, true);
             if (element != null) {
                 LockInfo info = element.get();
-                if (info != null && !info.isLockHolder(session)) {
+                if (info != null && !unlockIfExpired(info) && !info.isLockHolder(session)) {
                     if (info.getLockHolder() == null) {
                         info.setLockHolder(session);
                         if (info instanceof InternalLockInfo) {
@@ -794,7 +774,7 @@ public class LockManagerImpl
                 lockMap.map(node.getPrimaryPath(), true);
             if (element != null) {
                 LockInfo info = element.get();
-                if (info != null) {
+                if (info != null && !unlockIfExpired(info)) {
                     if (info.isLockHolder(session)) {
                         info.setLockHolder(null);
                     } else if (info.getLockHolder() != null) {
@@ -1101,15 +1081,19 @@ public class LockManagerImpl
      */
     public void onEvent(EventIterator events) {
         Iterator<HierarchyEvent> iter = consolidateEvents(events);
+        boolean needsSave = false;
         while (iter.hasNext()) {
             HierarchyEvent event = iter.next();
             if (event.type == Event.NODE_ADDED) {
-                nodeAdded(event.path);
+                needsSave |= nodeAdded(event.path);
             } else if (event.type == Event.NODE_REMOVED) {
-                nodeRemoved(event.path);
+                needsSave |= nodeRemoved(event.path);
             } else if (event.type == (Event.NODE_ADDED | Event.NODE_REMOVED)) {
-                nodeMoved(event.getOldPath(), event.getNewPath());
+                needsSave |= nodeMoved(event.getOldPath(), event.getNewPath());
             }
+        }
+        if (needsSave) {
+            save();
         }
     }
 
@@ -1152,7 +1136,7 @@ public class LockManagerImpl
      * Refresh a non-empty path element whose children might have changed
      * its position.
      */
-    private void refresh(PathMap.Element<LockInfo> element) {
+    private boolean refresh(PathMap.Element<LockInfo> element) {
         final ArrayList<LockInfo> infos = new ArrayList<LockInfo>();
         boolean needsSave = false;
 
@@ -1186,10 +1170,7 @@ public class LockManagerImpl
             }
         }
 
-        // save if required
-        if (needsSave) {
-            save();
-        }
+        return needsSave;
     }
 
     /**
@@ -1199,43 +1180,44 @@ public class LockManagerImpl
      *
      * @param path path of added node
      */
-    private void nodeAdded(Path path) {
+    private boolean nodeAdded(Path path) {
         acquire();
 
         try {
             PathMap.Element<LockInfo> parent =
                 lockMap.map(path.getAncestor(1), true);
             if (parent != null) {
-                refresh(parent);
+                return refresh(parent);
             }
         } catch (RepositoryException e) {
             log.warn("Unable to determine path of added node's parent.", e);
         } finally {
             release();
         }
+        return false;
     }
 
     /**
      * Invoked when some node has been moved. Relink the child inside our
      * map to the new parent.
-     *
-     * @param oldPath old path
+     *  @param oldPath old path
      * @param newPath new path
      */
-    private void nodeMoved(Path oldPath, Path newPath) {
+    private boolean nodeMoved(Path oldPath, Path newPath) {
         acquire();
 
         try {
             PathMap.Element<LockInfo> parent =
                 lockMap.map(oldPath.getAncestor(1), true);
             if (parent != null) {
-                refresh(parent);
+                return refresh(parent);
             }
         } catch (RepositoryException e) {
             log.warn("Unable to determine path of moved node's parent.", e);
         } finally {
             release();
         }
+        return false;
     }
 
     /**
@@ -1244,20 +1226,21 @@ public class LockManagerImpl
      *
      * @param path path of removed node
      */
-    private void nodeRemoved(Path path) {
+    private boolean nodeRemoved(Path path) {
         acquire();
 
         try {
             PathMap.Element<LockInfo> parent =
                 lockMap.map(path.getAncestor(1), true);
             if (parent != null) {
-                refresh(parent);
+                return refresh(parent);
             }
         } catch (RepositoryException e) {
             log.warn("Unable to determine path of removed node's parent.", e);
         } finally {
             release();
         }
+        return false;
     }
 
     /**
