@@ -133,7 +133,9 @@ abstract class AbstractPath implements Path, Path.Element {
     }
 
     public final Path resolve(Element element) {
-        if (element.denotesName()) {
+        if (element.denotesName() && element.denotesIdentifier()) {
+            return new CargoNamePath(this, element.getName(), element.getIdentifier());
+        } else if (element.denotesName()) {
             return new NamePath(this, element.getName(), element.getIndex());
         } else if (element.denotesParent()) {
             if (isAbsolute() && getDepth() == 0) {
@@ -164,6 +166,8 @@ abstract class AbstractPath implements Path, Path.Element {
             return new CurrentPath(this);
         } else if (relative.denotesParent()) {
             return new ParentPath(this);
+        } else if (relative.denotesIdentifier() && relative.denotesName()) {
+            return new CargoNamePath(this, relative.getName(), relative.getIdentifier());
         } else if (relative.denotesName()) {
             return new NamePath(this, relative.getName(), relative.getIndex());
         } else {

@@ -124,6 +124,8 @@ public class PathFactoryImpl implements PathFactory {
     public Path create(Path.Element element) {
         if (element.denotesCurrent()) {
             return CurrentPath.CURRENT_PATH;
+        } else if (element.denotesIdentifier() && element.denotesName()) {
+            return new CargoNamePath(null, element.getName(), element.getIdentifier());
         } else if (element.denotesIdentifier()) {
             return new IdentifierPath(element.getIdentifier());
         } else if (element.denotesName()) {
@@ -146,6 +148,8 @@ public class PathFactoryImpl implements PathFactory {
         for (Path.Element element : elements) {
             if (element.denotesCurrent()) {
                 path = new CurrentPath(path);
+            } else if (element.denotesName() && element.denotesIdentifier()) {
+                path = new CargoNamePath(path, element.getName(), element.getIdentifier());
             } else if (element.denotesIdentifier()) {
                 if (path != null) {
                     throw new IllegalArgumentException();
@@ -267,6 +271,10 @@ public class PathFactoryImpl implements PathFactory {
         int pos1 = elementString.indexOf(']');
         if (pos1 == -1) {
             throw new IllegalArgumentException("invalid PathElement literal: " + elementString + " (missing ']')");
+        }
+        if(elementString.charAt(pos+1)=='[') {
+             String argument = elementString.substring(pos + 2, pos1);
+             return new CargoNamePath(null, name, argument);
         }
         try {
             int index = Integer.valueOf(elementString.substring(pos + 1, pos1));

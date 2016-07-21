@@ -256,7 +256,7 @@ public class NodeImpl extends ItemImpl implements Node, JackrabbitNode {
      *                             relative path
      */
     private NodeId getNodeId(Path p) throws RepositoryException {
-        if (p.getLength() == 1 && p.denotesName()) {
+        if (p.getLength() == 1 && p.denotesName() && !p.denotesIdentifier()) {
             // check if node entry exists
             ChildNodeEntry cne = data.getNodeState().getChildNodeEntry(
                     p.getName(), p.getNormalizedIndex());
