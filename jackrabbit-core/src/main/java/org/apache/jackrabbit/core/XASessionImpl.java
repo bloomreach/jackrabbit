@@ -19,7 +19,12 @@ package org.apache.jackrabbit.core;
 import org.apache.jackrabbit.api.XASession;
 import org.apache.jackrabbit.core.config.WorkspaceConfig;
 import org.apache.jackrabbit.core.lock.XALockManager;
+import org.apache.jackrabbit.core.observation.EventStateCollectionFactory;
 import org.apache.jackrabbit.core.security.authentication.AuthContext;
+import org.apache.jackrabbit.core.session.SessionContext;
+import org.apache.jackrabbit.core.state.ItemStateCacheFactory;
+import org.apache.jackrabbit.core.state.LocalItemStateManager;
+import org.apache.jackrabbit.core.state.SharedItemStateManager;
 import org.apache.jackrabbit.core.state.XAItemStateManager;
 import org.apache.jackrabbit.core.version.InternalVersionManager;
 import org.apache.jackrabbit.core.version.InternalXAVersionManager;
@@ -410,5 +415,10 @@ public class XASessionImpl extends SessionImpl
         } else {
             return s1.equals(s2);
         }
+    }
+
+    @Override
+    public LocalItemStateManager createItemStateManager(RepositoryContext repositoryContext, WorkspaceImpl workspace, SharedItemStateManager sharedStateMgr, EventStateCollectionFactory factory, String attributeName, ItemStateCacheFactory cacheFactory) {
+            return XAItemStateManager.createInstance(sharedStateMgr, factory, attributeName, cacheFactory);
     }
 }
