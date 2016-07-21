@@ -895,15 +895,7 @@ public class WorkspaceImpl extends AbstractWorkspace
         SharedItemStateManager sism = getSharedItemStateManager();
         ItemStateCacheFactory iscf =
             context.getRepositoryContext().getItemStateCacheFactory();
-
-        // FIXME We should be able to avoid the instanceof operator here
-        if (context.getSessionImpl() instanceof XASessionImpl) {
-            return XAItemStateManager.createInstance(
-                    sism, this, null, iscf);
-        } else {
-            return LocalItemStateManager.createInstance(
-                    sism, this, iscf);
-        }
+        return context.getSessionImpl().createItemStateManager(this.context.getRepositoryContext(), this, sism, this, null, iscf);
 
     }
 
