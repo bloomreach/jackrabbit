@@ -522,15 +522,6 @@ public class BatchedItemOperations extends ItemValidator {
             throw new RepositoryException(msg);
         }
 
-        HierarchyManagerImpl hierMgr = (HierarchyManagerImpl) this.hierMgr;
-        if (hierMgr.isShareAncestor(target.getNodeId(), destParent.getNodeId())) {
-            String msg =
-                safeGetJCRPath(destPath) + ": invalid destination path"
-                + " (share cycle detected)";
-            log.debug(msg);
-            throw new RepositoryException(msg);
-        }
-
         // 2. check if target state can be removed from old/added to new parent
 
         checkRemoveNode(target, srcParent.getNodeId(),
