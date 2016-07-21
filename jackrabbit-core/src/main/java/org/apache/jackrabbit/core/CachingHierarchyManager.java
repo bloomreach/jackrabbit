@@ -574,6 +574,8 @@ public class CachingHierarchyManager extends HierarchyManagerImpl
             if (element.get() != null) {
                 if (!id.equals(((LRUEntry) element.get()).getId())) {
                     log.debug("overwriting PathMap.Element");
+                    evict(element, true);
+                    element = pathCache.put(path);
                 }
             }
             LRUEntry entry = (LRUEntry) idCache.get(id);
@@ -752,17 +754,7 @@ public class CachingHierarchyManager extends HierarchyManagerImpl
             if (entry != null && !entry.getId().equals(id)) {
                 return;
             }
-            // if item is shareable, remove this path only, otherwise
-            // every path this item has been mapped to
-            NodeState child = null;
-            if (hasItemState(id)) {
-                child = (NodeState) getItemState(id);
-            }
-            if (child == null || !child.isShareable()) {
-                evictAll(id, true);
-            } else {
-                evict(element, true);
-            }
+            evictAll(id, true);
         } else {
             // element itself is not cached, but removal might cause SNS
             // index shifting
