@@ -38,6 +38,12 @@ public interface InstanceRevision {
     void set(long value) throws JournalException;
 
     /**
+     * Sets the current revision id equal to the global revision id
+     * @throws JournalException
+     */
+    void setToGlobalRevision() throws JournalException;
+
+    /**
      * Closes the instance revision.
      */
     void close();
