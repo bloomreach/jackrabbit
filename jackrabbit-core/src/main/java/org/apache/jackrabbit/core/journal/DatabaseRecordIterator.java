@@ -16,6 +16,7 @@
  */
 package org.apache.jackrabbit.core.journal;
 
+import org.apache.jackrabbit.core.util.db.ConnectionHelper;
 import org.apache.jackrabbit.spi.commons.conversion.NamePathResolver;
 import org.apache.jackrabbit.spi.commons.namespace.NamespaceResolver;
 import org.slf4j.Logger;
@@ -32,56 +33,30 @@ import java.util.NoSuchElementException;
  */
 class DatabaseRecordIterator implements RecordIterator {
 
-    /**
-     * Logger.
-     */
-    private static Logger log = LoggerFactory.getLogger(DatabaseRecordIterator.class);
+    private static final Logger log = LoggerFactory.getLogger(DatabaseRecordIterator.class);
+    private static final int BATCH_SIZE = 1024;
 
-    /**
-     * Underlying result set.
-     */
-    private final ResultSet rs;
-
-    /**
-     * Namespace resolver.
-     */
+    private final ConnectionHelper conHelper;
+    private ResultSet rs;
+    private final String selectRecordsStmt;
+    private final long startRevision;
     private final NamespaceResolver resolver;
-
-    /**
-     * Name and Path resolver.
-     */
     private final NamePathResolver npResolver;
-
-    /**
-     * Current record.
-     */
     private ReadRecord record;
-
-    /**
-     * Last record returned.
-     */
     private ReadRecord lastRecord;
-
-    /**
-     * Flag indicating whether EOF was reached.
-     */
     private boolean isEOF;
 
-    /**
-     * Create a new instance of this class.
-     */
-    public DatabaseRecordIterator(ResultSet rs, NamespaceResolver resolver, NamePathResolver npResolver) {
-        this.rs = rs;
+    public DatabaseRecordIterator(final ConnectionHelper conHelper, final String selectRevisionsStmtSQL, final long startRevision, final NamespaceResolver resolver, final NamePathResolver npResolver) {
+        this.selectRecordsStmt = selectRevisionsStmtSQL;
+        this.startRevision = startRevision;
+        this.conHelper = conHelper;
         this.resolver = resolver;
         this.npResolver = npResolver;
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public boolean hasNext() {
         try {
-            if (!isEOF && record == null) {
+            if (record == null) {
                 fetchRecord();
             }
             return !isEOF;
@@ -113,16 +88,15 @@ class DatabaseRecordIterator implements RecordIterator {
         return lastRecord;
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public void close() {
         if (lastRecord != null) {
             close(lastRecord);
             lastRecord = null;
         }
         try {
-            rs.close();
+            if (rs != null) {
+                rs.close();
+            }
         } catch (SQLException e) {
             String msg = "Error while closing result set: " + e.getMessage();
             log.warn(msg);
@@ -133,15 +107,32 @@ class DatabaseRecordIterator implements RecordIterator {
      * Fetch the next record.
      */
     private void fetchRecord() throws SQLException {
-        if (rs.next()) {
-            long revision = rs.getLong(1);
-            String journalId = rs.getString(2);
-            String producerId = rs.getString(3);
-            DataInputStream dataIn = new DataInputStream(rs.getBinaryStream(4));
-            record = new ReadRecord(journalId, producerId, revision, dataIn, 0, resolver, npResolver);
+        if (rs != null && rs.next()) {
+            readRecord();
         } else {
-            isEOF = true;
+            try {
+                if (rs != null) {
+                    rs.close();
+                }
+                final long fromRevision = lastRecord != null ? lastRecord.getRevision() : startRevision;
+                rs = conHelper.exec(selectRecordsStmt, new Object[]{ fromRevision }, false, BATCH_SIZE);
+                if (rs.next()) {
+                    readRecord();
+                } else {
+                    isEOF = true;
+                }
+            } catch (SQLException e) {
+                log.error("Failed to retrieve journal records", e);
+            }
         }
+    }
+
+    private void readRecord() throws SQLException {
+        long revision = rs.getLong(1);
+        String journalId = rs.getString(2);
+        String producerId = rs.getString(3);
+        DataInputStream dataIn = new DataInputStream(rs.getBinaryStream(4));
+        record = new ReadRecord(journalId, producerId, revision, dataIn, 0, resolver, npResolver);
     }
 
     /**

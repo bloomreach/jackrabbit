@@ -415,24 +415,14 @@ public class DatabaseJournal extends AbstractJournal implements DatabaseAware {
      * {@inheritDoc}
      */
     public RecordIterator getRecords(long startRevision) throws JournalException {
-        try {
-            return new DatabaseRecordIterator(conHelper.exec(selectRevisionsStmtSQL, new Object[]{new Long(
-                    startRevision)}, false, 0), getResolver(), getNamePathResolver());
-        } catch (SQLException e) {
-            throw new JournalException("Unable to return record iterator.", e);
-        }
+        return new DatabaseRecordIterator(conHelper, selectRevisionsStmtSQL, startRevision, getResolver(), getNamePathResolver());
     }
 
     /**
      * {@inheritDoc}
      */
     public RecordIterator getRecords() throws JournalException {
-        try {
-            return new DatabaseRecordIterator(conHelper.exec(selectRevisionsStmtSQL, new Object[]{new Long(
-                    Long.MIN_VALUE)}, false, 0), getResolver(), getNamePathResolver());
-        } catch (SQLException e) {
-            throw new JournalException("Unable to return record iterator.", e);
-        }
+        return new DatabaseRecordIterator(conHelper, selectRevisionsStmtSQL, Long.MIN_VALUE, getResolver(), getNamePathResolver());
     }
 
     /**
