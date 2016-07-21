@@ -32,6 +32,8 @@ import org.apache.lucene.document.Document;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.index.TermDocs;
+import org.apache.lucene.search.DocIdSet;
+import org.apache.lucene.search.DocIdSetIterator;
 import org.apache.lucene.search.Explanation;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.Scorer;
@@ -334,7 +336,7 @@ class ChildAxisQuery extends Query implements JackrabbitQuery {
                 nameTestScorer = new NameQuery(nameTest, version, nsMappings).weight(searcher).scorer(reader, scoreDocsInOrder, false);
             }
             return new ChildAxisScorer(searcher.getSimilarity(),
-                    reader, (HierarchyResolver) reader);
+                    reader, searcher, (HierarchyResolver)reader);
         }
 
         /**
@@ -372,19 +374,34 @@ class ChildAxisQuery extends Query implements JackrabbitQuery {
          */
         private Hits hits;
 
+        private DocIdSet filter;
+
+        private boolean filterIteratorExhausted;
+
+        private DocIdSetIterator filterIterator;
+
         /**
          * Creates a new <code>ChildAxisScorer</code>.
          *
          * @param similarity the <code>Similarity</code> instance to use.
          * @param reader     for index access.
+         * @param searcher
          * @param hResolver  the hierarchy resolver of <code>reader</code>.
          */
         protected ChildAxisScorer(Similarity similarity,
-                                  IndexReader reader,
+                                  IndexReader reader, final Searcher searcher,
                                   HierarchyResolver hResolver) {
             super(similarity);
             this.reader = reader;
             this.hResolver = hResolver;
+            if (searcher instanceof JackrabbitIndexSearcher && ((JackrabbitIndexSearcher)searcher).getFilter() != null) {
+                try {
+                    // we need two
+                    filter = ((JackrabbitIndexSearcher)searcher).getFilter().getDocIdSet(reader);
+                } catch (IOException e) {
+                    log.warn("IOException while getting filter : ", e.toString());
+                }
+            }
         }
 
         @Override
@@ -396,7 +413,7 @@ class ChildAxisQuery extends Query implements JackrabbitQuery {
             calculateChildren();
             do {
                 nextDoc = hits.next();
-            } while (nextDoc > -1 && !indexIsValid(nextDoc));
+            } while (nextDoc > -1 && (isFiltered(nextDoc, filterIterator) || !indexIsValid(nextDoc)));
 
             if (nextDoc < 0) {
                 nextDoc = NO_MORE_DOCS;
@@ -434,7 +451,7 @@ class ChildAxisQuery extends Query implements JackrabbitQuery {
                 nextDoc = NO_MORE_DOCS;
             }
 
-            while (nextDoc != NO_MORE_DOCS && !indexIsValid(nextDoc)) {
+            while (nextDoc != NO_MORE_DOCS && (isFiltered(nextDoc, filterIterator) || !indexIsValid(nextDoc))) {
                 nextDoc();
             }
             return nextDoc;
@@ -442,7 +459,7 @@ class ChildAxisQuery extends Query implements JackrabbitQuery {
 
         private void calculateChildren() throws IOException {
             if (hits == null) {
-
+                resetOrInitFilter();
                 final ChildrenCalculator[] calc = new ChildrenCalculator[1];
                 if (nameTestScorer == null) {
                     // always use simple in that case
@@ -450,6 +467,9 @@ class ChildAxisQuery extends Query implements JackrabbitQuery {
                     contextScorer.score(new AbstractHitCollector() {
                         @Override
                         protected void collect(int doc, float score) {
+                            if (isFiltered(doc, filterIterator)) {
+                                return;
+                            }
                             calc[0].collectContextHit(doc);
                         }
                     });
@@ -462,6 +482,9 @@ class ChildAxisQuery extends Query implements JackrabbitQuery {
 
                         @Override
                         protected void collect(int doc, float score) {
+                            if (isFiltered(doc, filterIterator)) {
+                                return;
+                            }
                             calc[0].collectContextHit(doc);
                             if (docIds != null) {
                                 docIds.add(doc);
@@ -482,6 +505,42 @@ class ChildAxisQuery extends Query implements JackrabbitQuery {
 
                 hits = calc[0].getHits();
             }
+            // reset the iterator since it only advances and it is used to check the 'self' docs now.
+            // next the children will be checked that require with a clean fresh iterator
+            resetOrInitFilter();
+        }
+
+        private void resetOrInitFilter() throws IOException {
+            filterIteratorExhausted = false;
+            if (filter != null) {
+                filterIterator = filter.iterator();
+            }
+        }
+
+        private boolean isFiltered(final int doc, final DocIdSetIterator filterIterator) {
+            if (filterIterator == null) {
+                return false;
+            }
+
+            if (filterIteratorExhausted) {
+                return true;
+            }
+
+            try {
+                final int advance = filterIterator.advance(doc);
+                if (NO_MORE_DOCS == advance) {
+                    filterIteratorExhausted = true;
+                    return true;
+                }
+                if (advance != doc) {
+                    // doc is not readable by filter : Don't return the possibly readable parent!
+                    return true;
+                }
+            } catch (IOException e) {
+                log.warn("Exception while using filter : {}", e.toString());
+                return true;
+            }
+            return false;
         }
 
         private boolean indexIsValid(int i) throws IOException {
