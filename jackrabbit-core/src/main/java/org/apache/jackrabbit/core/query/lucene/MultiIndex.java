@@ -250,7 +250,7 @@ public class MultiIndex {
         this.excludedIDs = new HashSet<NodeId>(excludedIDs);
         this.nsMappings = handler.getNamespaceMappings();
 
-        indexNames = new IndexInfos(indexDir, "indexes");
+        indexNames = new IndexInfos(indexDir, "indexes", directoryManager);
 
         this.indexHistory = new IndexHistory(indexDir,
                 handler.getMaxHistoryAge() * 1000);

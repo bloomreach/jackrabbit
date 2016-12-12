@@ -52,7 +52,7 @@ public class IndexInfosTest extends TestCase {
 
     public void testEmptyIndexesFile() throws IOException {
         // creates initial generation of infos
-        IndexInfos infos = new IndexInfos(dir, "indexes");
+        IndexInfos infos = new IndexInfos(dir, "indexes", null);
         long initialGeneration = infos.getGeneration();
 
         // create second generation
@@ -67,7 +67,7 @@ public class IndexInfosTest extends TestCase {
         new IndexHistory(dir, Integer.MAX_VALUE); // must succeed
 
         // read index infos again
-        infos = new IndexInfos(dir, "indexes");
+        infos = new IndexInfos(dir, "indexes", null);
         assertEquals("must read initial generation", initialGeneration, infos.getGeneration());
 
         // create new generation

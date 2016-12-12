@@ -69,6 +69,7 @@ import org.apache.jackrabbit.core.query.lucene.directory.DirectoryManager;
 import org.apache.jackrabbit.core.query.lucene.directory.FSDirectoryManager;
 import org.apache.jackrabbit.core.query.lucene.hits.AbstractHitCollector;
 import org.apache.jackrabbit.core.session.SessionContext;
+import org.apache.jackrabbit.core.state.ChangeLog;
 import org.apache.jackrabbit.core.state.ItemState;
 import org.apache.jackrabbit.core.state.ItemStateException;
 import org.apache.jackrabbit.core.state.ItemStateManager;
@@ -100,6 +101,8 @@ import org.apache.lucene.search.Similarity;
 import org.apache.lucene.search.Sort;
 import org.apache.lucene.search.SortField;
 import org.apache.lucene.search.TermQuery;
+import org.apache.lucene.store.Directory;
+import org.apache.lucene.store.IndexInput;
 import org.apache.lucene.util.Version;
 import org.apache.tika.config.TikaConfig;
 import org.apache.tika.fork.ForkParser;
@@ -580,7 +583,7 @@ public class SearchIndex extends AbstractQueryHandler {
             }
 
             final ClusterNode clusterNode = getContext().getClusterNode();
-            if (clusterNode != null ) {
+            if (clusterNode != null) {
                 // it is safe to set the local revision equal to the global revision
                 // because there is an entire index recreation. If we don't do this, after the index creation,
                 // all documents after the local revision get again removed from the index and then later added again
@@ -591,6 +594,19 @@ public class SearchIndex extends AbstractQueryHandler {
                     context.getRootId(), rootPath);
 
             checkPendingJournalChanges(context);
+        } else {
+            Directory indexDirectory = directoryManager.getDirectory(".");
+            if (indexDirectory.fileExists("indexRevision")) {
+                final ClusterNode clusterNode = getContext().getClusterNode();
+                if (clusterNode != null) {
+                    IndexInput in = indexDirectory.openInput("indexRevision");
+                    long indexRevisionBefore = in.readLong();
+                    long indexRevisionAfter = in.readLong();
+                    undoAdded(indexRevisionBefore, indexRevisionAfter, context);
+                    clusterNode.setRevision(indexRevisionBefore);
+                }
+                indexDirectory.deleteFile("indexRevision");
+            }
         }
         if (consistencyCheckEnabled
                 && (index.getRedoLogApplied() || forceConsistencyCheck)) {
@@ -624,7 +640,7 @@ public class SearchIndex extends AbstractQueryHandler {
                     getIndexFormatVersion().getVersion());
         }
     }
-
+    
     /**
      * Adds the <code>node</code> to the search index.
      * @param node the node to add.
@@ -2576,29 +2592,28 @@ public class SearchIndex extends AbstractQueryHandler {
      * @throws IOException
      */
     private void checkPendingJournalChanges(QueryHandlerContext context) {
-        ClusterNode cn = context.getClusterNode();
+        final ClusterNode cn = context.getClusterNode();
         if (cn == null) {
             return;
         }
+        undoAdded(cn.getRevision(), -1, context);
+    }
 
-        List<NodeId> addedIds = new ArrayList<NodeId>();
-        long rev = cn.getRevision();
-
-        List<ChangeLogRecord> changes = getChangeLogRecords(rev, context.getWorkspace());
-        Iterator<ChangeLogRecord> iterator = changes.iterator();
-        while (iterator.hasNext()) {
-            ChangeLogRecord record = iterator.next();
-            for (ItemState state : record.getChanges().addedStates()) {
+    private void undoAdded(final long fromRevision, final long toRevision, final QueryHandlerContext context) {
+        Collection<NodeId> added = new ArrayList<NodeId>();
+        List<ChangeLogRecord> records = getChangeLogRecords(fromRevision, toRevision, context.getWorkspace());
+        for (ChangeLogRecord record : records) {
+            ChangeLog changes = record.getChanges();
+            for (ItemState state : changes.addedStates()) {
                 if (!state.isNode()) {
                     continue;
                 }
-                addedIds.add((NodeId) state.getId());
+                added.add((NodeId) state.getId());
             }
         }
-        if (!addedIds.isEmpty()) {
-            Collection<NodeState> empty = Collections.emptyList();
+        if (!added.isEmpty()) {
             try {
-                updateNodes(addedIds.iterator(), empty.iterator());
+                updateNodes(added.iterator(), Collections.<NodeState>emptyList().iterator());
             } catch (Exception e) {
                 log.error(e.getMessage(), e);
             }
@@ -2623,29 +2638,32 @@ public class SearchIndex extends AbstractQueryHandler {
      * Polls the underlying journal for events of the type ChangeLogRecord that
      * happened after a given revision, on a given workspace.
      *
-     * @param revision
+     * @param fromRevision
      *            starting revision
      * @param workspace
      *            the workspace name
      * @return
      */
-    private List<ChangeLogRecord> getChangeLogRecords(long revision,
+    private List<ChangeLogRecord> getChangeLogRecords(long fromRevision, long toRevision,
                                                       final String workspace) {
         log.debug(
-                "Get changes from the Journal for revision {} and workspace {}.",
-                revision, workspace);
+                "Get changes from the Journal from revision {} to revision {} in workspace {}.", 
+                new Object[] { fromRevision, toRevision, workspace });
         ClusterNode cn = getContext().getClusterNode();
         if (cn == null) {
             return Collections.emptyList();
         }
         Journal journal = cn.getJournal();
-        final List<ChangeLogRecord> events = new ArrayList<ChangeLogRecord>();
         ClusterRecordDeserializer deserializer = new ClusterRecordDeserializer();
+        ChangeLogRecordCollector collector = new ChangeLogRecordCollector(workspace);
         RecordIterator records = null;
         try {
-            records = journal.getRecords(revision);
+            records = journal.getRecords(fromRevision);
             while (records.hasNext()) {
                 Record record = records.nextRecord();
+                if (toRevision != -1 && record.getRevision() > toRevision) {
+                    break;
+                }
                 if (!record.getProducerId().equals(cn.getId())) {
                     continue;
                 }
@@ -2660,29 +2678,7 @@ public class SearchIndex extends AbstractQueryHandler {
                 if (r == null) {
                     continue;
                 }
-                r.process(new ClusterRecordProcessor() {
-                    public void process(ChangeLogRecord record) {
-                        String eventW = record.getWorkspace();
-                        if (eventW != null ? eventW.equals(workspace) : workspace == null) {
-                            events.add(record);
-                        }
-                    }
-
-                    public void process(LockRecord record) {
-                    }
-
-                    public void process(NamespaceRecord record) {
-                    }
-
-                    public void process(NodeTypeRecord record) {
-                    }
-
-                    public void process(PrivilegeRecord record) {
-                    }
-
-                    public void process(WorkspaceRecord record) {
-                    }
-                });
+                r.process(collector);
             }
         } catch (JournalException e1) {
             log.error(e1.getMessage(), e1);
@@ -2691,6 +2687,39 @@ public class SearchIndex extends AbstractQueryHandler {
                 records.close();
             }
         }
-        return events;
+        return collector.events;
+    }
+    
+    private static class ChangeLogRecordCollector implements ClusterRecordProcessor {
+        
+        private final String workspace;
+        private final List<ChangeLogRecord> events = new ArrayList<ChangeLogRecord>();
+
+        private ChangeLogRecordCollector(final String workspace) {
+            this.workspace = workspace;
+        }
+
+        public void process(ChangeLogRecord record) {
+            String eventW = record.getWorkspace();
+            if (eventW != null ? eventW.equals(workspace) : workspace == null) {
+                events.add(record);
+            }
+        }
+
+        public void process(LockRecord record) {
+        }
+
+        public void process(NamespaceRecord record) {
+        }
+
+        public void process(NodeTypeRecord record) {
+        }
+
+        public void process(PrivilegeRecord record) {
+        }
+
+        public void process(WorkspaceRecord record) {
+        }
+
     }
 }
