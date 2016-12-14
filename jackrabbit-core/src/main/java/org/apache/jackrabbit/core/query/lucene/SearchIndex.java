@@ -600,10 +600,14 @@ public class SearchIndex extends AbstractQueryHandler {
                 final ClusterNode clusterNode = getContext().getClusterNode();
                 if (clusterNode != null) {
                     IndexInput in = indexDirectory.openInput("indexRevision");
-                    long indexRevisionBefore = in.readLong();
-                    long indexRevisionAfter = in.readLong();
-                    undoAdded(indexRevisionBefore, indexRevisionAfter, context);
-                    clusterNode.setRevision(indexRevisionBefore);
+                    try {
+                        long indexRevisionBefore = in.readLong();
+                        long indexRevisionAfter = in.readLong();
+                        undoAdded(indexRevisionBefore, indexRevisionAfter, context);
+                        clusterNode.setRevision(indexRevisionBefore);
+                    } finally {
+                        in.close();
+                    }
                 }
                 indexDirectory.deleteFile("indexRevision");
             }
