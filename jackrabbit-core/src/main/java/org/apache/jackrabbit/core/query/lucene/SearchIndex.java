@@ -626,6 +626,8 @@ public class SearchIndex extends AbstractQueryHandler {
                         throw new IllegalStateException("Cannot startup because of corrupted indexRevision.properties file.", e);
                     } catch (IllegalArgumentException e) {
                         throw new IllegalArgumentException("Cannot startup because of corrupted or outdated indexRevision.properties file.", e);
+                    } catch (IllegalStateException e) {
+                        throw new IllegalStateException("Cannot startup because of corrupted or outdated indexRevision.properties file.", e);
                     }
 
                     indexRevisionFile.delete();
@@ -2627,6 +2629,15 @@ public class SearchIndex extends AbstractQueryHandler {
     private void undoAdded(final long fromRevision, final long toRevision, final QueryHandlerContext context) {
         Collection<NodeId> added = new ArrayList<NodeId>();
         List<ChangeLogRecord> records = getChangeLogRecords(fromRevision, toRevision, context.getWorkspace());
+        if (!records.isEmpty()) {
+            long startRevisionJournalTable = records.get(0).getRevision();
+            if (startRevisionJournalTable > (fromRevision + 1)) {
+                throw new IllegalStateException(String.format("Required start revision '%s' does NOT exist any more in the " +
+                        "Journal table (oldest journal table record has revision '%s') implying the index can be correctly updated. Remove the index and restart to " +
+                        "trigger a complete new index built or provide a newer index export.", fromRevision + 1, startRevisionJournalTable));
+            }
+        }
+
         for (ChangeLogRecord record : records) {
             ChangeLog changes = record.getChanges();
             for (ItemState state : changes.addedStates()) {
