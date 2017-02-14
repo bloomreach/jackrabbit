@@ -17,6 +17,7 @@
 package org.apache.jackrabbit.core.query.lucene;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
@@ -31,6 +32,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 
 import javax.jcr.PropertyType;
@@ -595,22 +597,41 @@ public class SearchIndex extends AbstractQueryHandler {
 
             checkPendingJournalChanges(context);
         } else {
-            Directory indexDirectory = directoryManager.getDirectory(".");
-            if (indexDirectory.fileExists("indexRevision")) {
-                final ClusterNode clusterNode = getContext().getClusterNode();
-                if (clusterNode != null) {
-                    IndexInput in = indexDirectory.openInput("indexRevision");
-                    try {
-                        long indexRevisionBefore = in.readLong();
-                        long indexRevisionAfter = in.readLong();
-                        undoAdded(indexRevisionBefore, indexRevisionAfter, context);
-                        clusterNode.setRevision(indexRevisionBefore);
-                    } finally {
-                        in.close();
-                    }
-                }
-                indexDirectory.deleteFile("indexRevision");
+            File baseDir = null;
+            try {
+                baseDir = directoryManager.getBaseDir();
+            } catch (Exception e) {
+                log.info("Directory manager getBaseDir() is not supported. Most likely RAMDirectoryManager.");
             }
+            if (baseDir != null) {
+                final File indexRevisionFile = new File(baseDir, "indexRevision.properties");
+                if (indexRevisionFile.exists()) {
+                    try {
+                        // restoring index from an exported index
+                        final ClusterNode clusterNode = getContext().getClusterNode();
+                        if (clusterNode != null) {
+                            Properties indexRevisionProperties = new Properties();
+                            indexRevisionProperties.load(new FileInputStream(indexRevisionFile));
+                            long indexRevisionBefore = Long.parseLong(indexRevisionProperties.getProperty("indexRevisionBefore"));
+                            long indexRevisionAfter = Long.parseLong(indexRevisionProperties.getProperty("indexRevisionAfter"));
+
+                            undoAdded(indexRevisionBefore, indexRevisionAfter, context);
+                            clusterNode.setRevision(indexRevisionBefore);
+                        }
+                    } catch (NumberFormatException e) {
+                        log.error("Cannot startup because incorrect 'indexRevision.properties' format for indexRevisionBefore " +
+                                "or indexRevisionAfter. Expected a number.", e);
+                        throw e;
+                    } catch (IOException e) {
+                        throw new IllegalStateException("Cannot startup because of corrupted indexRevision.properties file.", e);
+                    } catch (IllegalArgumentException e) {
+                        throw new IllegalArgumentException("Cannot startup because of corrupted or outdated indexRevision.properties file.", e);
+                    }
+
+                    indexRevisionFile.delete();
+                }
+            }
+
         }
         if (consistencyCheckEnabled
                 && (index.getRedoLogApplied() || forceConsistencyCheck)) {
@@ -644,7 +665,7 @@ public class SearchIndex extends AbstractQueryHandler {
                     getIndexFormatVersion().getVersion());
         }
     }
-    
+
     /**
      * Adds the <code>node</code> to the search index.
      * @param node the node to add.
@@ -886,7 +907,7 @@ public class SearchIndex extends AbstractQueryHandler {
      * @param orderSpecs      the order specs for the sort order properties.
      *                        <code>true</code> indicates ascending order,
      *                        <code>false</code> indicates descending.
-     * @param orderFuncs      functions for the properties for sort order. 
+     * @param orderFuncs      functions for the properties for sort order.
      * @param resultFetchHint a hint on how many results should be fetched.  @return the query hits.
      * @throws IOException if an error occurs while searching the index.
      */
@@ -1215,7 +1236,7 @@ public class SearchIndex extends AbstractQueryHandler {
      *
      * @param orderProps the order properties.
      * @param orderSpecs the order specs for the properties.
-     * @param orderFuncs the functions for the properties. 
+     * @param orderFuncs the functions for the properties.
      * @return an array of sort fields
      */
     protected SortField[] createSortFields(Path[] orderProps,
@@ -1294,7 +1315,7 @@ public class SearchIndex extends AbstractQueryHandler {
      *
      * @return the actual index.
      */
-    protected MultiIndex getIndex() {
+    public MultiIndex getIndex() {
         return index;
     }
 
@@ -2651,7 +2672,7 @@ public class SearchIndex extends AbstractQueryHandler {
     private List<ChangeLogRecord> getChangeLogRecords(long fromRevision, long toRevision,
                                                       final String workspace) {
         log.debug(
-                "Get changes from the Journal from revision {} to revision {} in workspace {}.", 
+                "Get changes from the Journal from revision {} to revision {} in workspace {}.",
                 new Object[] { fromRevision, toRevision, workspace });
         ClusterNode cn = getContext().getClusterNode();
         if (cn == null) {
@@ -2693,9 +2714,9 @@ public class SearchIndex extends AbstractQueryHandler {
         }
         return collector.events;
     }
-    
+
     private static class ChangeLogRecordCollector implements ClusterRecordProcessor {
-        
+
         private final String workspace;
         private final List<ChangeLogRecord> events = new ArrayList<ChangeLogRecord>();
 

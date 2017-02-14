@@ -19,6 +19,7 @@ package org.apache.jackrabbit.core.query.lucene.directory;
 import org.apache.lucene.store.Directory;
 import org.apache.jackrabbit.core.query.lucene.SearchIndex;
 
+import java.io.File;
 import java.io.IOException;
 
 /**
@@ -45,6 +46,9 @@ public interface DirectoryManager {
      * @throws IOException if an error occurs while looking up directories.
      */
     boolean hasDirectory(String name) throws IOException;
+
+
+    File getBaseDir();
 
     /**
      * Gets the directory with the given <code>name</code>. If the directory
