@@ -34,6 +34,7 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 
 import org.apache.jackrabbit.core.query.lucene.directory.DirectoryManager;
+import org.apache.jackrabbit.core.query.lucene.directory.FSDirectoryManager;
 import org.apache.jackrabbit.core.query.lucene.directory.IndexInputStream;
 import org.apache.jackrabbit.core.query.lucene.directory.IndexOutputStream;
 import org.apache.lucene.store.Directory;
@@ -103,15 +104,13 @@ class IndexInfos implements Cloneable {
         this.directory = dir;
         this.name = baseName;
         long gens[] = getGenerations(getFileNames(dir, baseName), baseName);
-        if (gens.length == 0) {
-            if (directoryManager != null) {
-                try {
-                    for (String existingIndexName : directoryManager.getDirectoryNames()) {
-                        indexes.put(existingIndexName, new IndexInfo(existingIndexName, 0));
-                    }
-                } catch (IOException ignore) {
-                    // happens when index directory is empty or does not exist
+        if (gens.length == 0 && directoryManager instanceof FSDirectoryManager) {
+            try {
+                for (String existingIndexName : directoryManager.getDirectoryNames()) {
+                    indexes.put(existingIndexName, new IndexInfo(existingIndexName, 0));
                 }
+            } catch (IOException ignore) {
+                // happens when index directory is empty or does not exist
             }
             // write initial infos
             write();
