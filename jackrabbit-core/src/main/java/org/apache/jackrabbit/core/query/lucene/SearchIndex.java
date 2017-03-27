@@ -2633,7 +2633,7 @@ public class SearchIndex extends AbstractQueryHandler {
             long startRevisionJournalTable = records.get(0).getRevision();
             if (startRevisionJournalTable > (fromRevision + 1)) {
                 throw new IllegalStateException(String.format("Required start revision '%s' does NOT exist any more in the " +
-                        "Journal table (oldest journal table record has revision '%s') implying the index can be correctly updated. Remove the index and restart to " +
+                        "Journal table (oldest journal table record has revision '%s') implying the index cannot be correctly updated. Remove the index and restart to " +
                         "trigger a complete new index built or provide a newer index export.", fromRevision + 1, startRevisionJournalTable));
             }
         }
