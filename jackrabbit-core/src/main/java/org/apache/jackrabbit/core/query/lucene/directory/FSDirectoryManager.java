@@ -52,6 +52,11 @@ public class FSDirectoryManager implements DirectoryManager {
         useSimpleFSDirectory = handler.isUseSimpleFSDirectory();
     }
 
+    @Override
+    public File getBaseDir() {
+        return baseDir;
+    }
+
     /**
      * {@inheritDoc}
      */
