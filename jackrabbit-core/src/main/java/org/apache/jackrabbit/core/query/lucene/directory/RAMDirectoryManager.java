@@ -20,6 +20,7 @@ import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.RAMDirectory;
 import org.apache.jackrabbit.core.query.lucene.SearchIndex;
 
+import java.io.File;
 import java.util.Map;
 import java.util.HashMap;
 import java.io.IOException;
@@ -39,6 +40,11 @@ public class RAMDirectoryManager implements DirectoryManager {
      * {@inheritDoc}
      */
     public void init(SearchIndex handler) throws IOException {
+    }
+
+    @Override
+    public File getBaseDir() {
+        throw new UnsupportedOperationException("RamDirectoryManager does not have a base dir");
     }
 
     /**
