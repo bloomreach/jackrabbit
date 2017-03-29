@@ -17,6 +17,7 @@
 package org.apache.jackrabbit.core.query.lucene;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
@@ -31,6 +32,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 
 import javax.jcr.PropertyType;
@@ -69,6 +71,7 @@ import org.apache.jackrabbit.core.query.lucene.directory.DirectoryManager;
 import org.apache.jackrabbit.core.query.lucene.directory.FSDirectoryManager;
 import org.apache.jackrabbit.core.query.lucene.hits.AbstractHitCollector;
 import org.apache.jackrabbit.core.session.SessionContext;
+import org.apache.jackrabbit.core.state.ChangeLog;
 import org.apache.jackrabbit.core.state.ItemState;
 import org.apache.jackrabbit.core.state.ItemStateException;
 import org.apache.jackrabbit.core.state.ItemStateManager;
@@ -591,6 +594,43 @@ public class SearchIndex extends AbstractQueryHandler {
                     context.getRootId(), rootPath);
 
             checkPendingJournalChanges(context);
+        } else {
+            File baseDir = null;
+            try {
+                baseDir = directoryManager.getBaseDir();
+            } catch (Exception e) {
+                log.info("Directory manager getBaseDir() is not supported. Most likely RAMDirectoryManager.");
+            }
+            if (baseDir != null) {
+                final File indexRevisionFile = new File(baseDir, "indexRevision.properties");
+                if (indexRevisionFile.exists()) {
+                    try {
+                        // restoring index from an exported index
+                        final ClusterNode clusterNode = getContext().getClusterNode();
+                        if (clusterNode != null) {
+                            Properties indexRevisionProperties = new Properties();
+                            indexRevisionProperties.load(new FileInputStream(indexRevisionFile));
+                            long indexRevisionBefore = Long.parseLong(indexRevisionProperties.getProperty("indexRevisionBefore"));
+                            long indexRevisionAfter = Long.parseLong(indexRevisionProperties.getProperty("indexRevisionAfter"));
+
+                            undoAdded(indexRevisionBefore, indexRevisionAfter, context);
+                            clusterNode.setRevision(indexRevisionBefore);
+                        }
+                    } catch (NumberFormatException e) {
+                        log.error("Cannot startup because incorrect 'indexRevision.properties' format for indexRevisionBefore " +
+                                "or indexRevisionAfter. Expected a number.", e);
+                        throw e;
+                    } catch (IOException e) {
+                        throw new IllegalStateException("Cannot startup because of corrupted indexRevision.properties file.", e);
+                    } catch (IllegalArgumentException e) {
+                        throw new IllegalArgumentException("Cannot startup because of corrupted or outdated indexRevision.properties file.", e);
+                    } catch (IllegalStateException e) {
+                        throw new IllegalStateException("Cannot startup because of corrupted or outdated indexRevision.properties file.", e);
+                    }
+
+                    indexRevisionFile.delete();
+                }
+            }
         }
         if (consistencyCheckEnabled
                 && (index.getRedoLogApplied() || forceConsistencyCheck)) {
@@ -1277,7 +1317,7 @@ public class SearchIndex extends AbstractQueryHandler {
      *
      * @return the actual index.
      */
-    protected MultiIndex getIndex() {
+    public MultiIndex getIndex() {
         return index;
     }
 
@@ -2579,29 +2619,37 @@ public class SearchIndex extends AbstractQueryHandler {
      * @throws IOException
      */
     private void checkPendingJournalChanges(QueryHandlerContext context) {
-        ClusterNode cn = context.getClusterNode();
+        final ClusterNode cn = context.getClusterNode();
         if (cn == null) {
             return;
         }
+        undoAdded(cn.getRevision(), -1, context);
+    }
 
-        List<NodeId> addedIds = new ArrayList<NodeId>();
-        long rev = cn.getRevision();
+    private void undoAdded(final long fromRevision, final long toRevision, final QueryHandlerContext context) {
+        Collection<NodeId> added = new ArrayList<NodeId>();
+        List<ChangeLogRecord> records = getChangeLogRecords(fromRevision, toRevision, context.getWorkspace());
+        if (!records.isEmpty()) {
+            long startRevisionJournalTable = records.get(0).getRevision();
+            if (startRevisionJournalTable > (fromRevision + 1)) {
+                throw new IllegalStateException(String.format("Required start revision '%s' does NOT exist any more in the " +
+                        "Journal table (oldest journal table record has revision '%s') implying the index cannot be correctly updated. Remove the index and restart to " +
+                        "trigger a complete new index built or provide a newer index export.", fromRevision + 1, startRevisionJournalTable));
+            }
+        }
 
-        List<ChangeLogRecord> changes = getChangeLogRecords(rev, context.getWorkspace());
-        Iterator<ChangeLogRecord> iterator = changes.iterator();
-        while (iterator.hasNext()) {
-            ChangeLogRecord record = iterator.next();
-            for (ItemState state : record.getChanges().addedStates()) {
+        for (ChangeLogRecord record : records) {
+            ChangeLog changes = record.getChanges();
+            for (ItemState state : changes.addedStates()) {
                 if (!state.isNode()) {
                     continue;
                 }
-                addedIds.add((NodeId) state.getId());
+                added.add((NodeId) state.getId());
             }
         }
-        if (!addedIds.isEmpty()) {
-            Collection<NodeState> empty = Collections.emptyList();
+        if (!added.isEmpty()) {
             try {
-                updateNodes(addedIds.iterator(), empty.iterator());
+                updateNodes(added.iterator(), Collections.<NodeState>emptyList().iterator());
             } catch (Exception e) {
                 log.error(e.getMessage(), e);
             }
@@ -2626,29 +2674,32 @@ public class SearchIndex extends AbstractQueryHandler {
      * Polls the underlying journal for events of the type ChangeLogRecord that
      * happened after a given revision, on a given workspace.
      *
-     * @param revision
+     * @param fromRevision
      *            starting revision
      * @param workspace
      *            the workspace name
      * @return
      */
-    private List<ChangeLogRecord> getChangeLogRecords(long revision,
+    private List<ChangeLogRecord> getChangeLogRecords(long fromRevision, long toRevision,
             final String workspace) {
         log.debug(
-                "Get changes from the Journal for revision {} and workspace {}.",
-                revision, workspace);
+                "Get changes from the Journal from revision {} to revision {} in workspace {}.",
+                new Object[] { fromRevision, toRevision, workspace });
         ClusterNode cn = getContext().getClusterNode();
         if (cn == null) {
             return Collections.emptyList();
         }
         Journal journal = cn.getJournal();
-        final List<ChangeLogRecord> events = new ArrayList<ChangeLogRecord>();
         ClusterRecordDeserializer deserializer = new ClusterRecordDeserializer();
+        ChangeLogRecordCollector collector = new ChangeLogRecordCollector(workspace);
         RecordIterator records = null;
         try {
-            records = journal.getRecords(revision);
+            records = journal.getRecords(fromRevision);
             while (records.hasNext()) {
                 Record record = records.nextRecord();
+                if (toRevision != -1 && record.getRevision() > toRevision) {
+                    break;
+                }
                 if (!record.getProducerId().equals(cn.getId())) {
                     continue;
                 }
@@ -2663,29 +2714,7 @@ public class SearchIndex extends AbstractQueryHandler {
                 if (r == null) {
                     continue;
                 }
-                r.process(new ClusterRecordProcessor() {
-                    public void process(ChangeLogRecord record) {
-                        String eventW = record.getWorkspace();
-                        if (eventW != null ? eventW.equals(workspace) : workspace == null) {
-                            events.add(record);
-                        }
-                    }
-
-                    public void process(LockRecord record) {
-                    }
-
-                    public void process(NamespaceRecord record) {
-                    }
-
-                    public void process(NodeTypeRecord record) {
-                    }
-
-                    public void process(PrivilegeRecord record) {
-                    }
-
-                    public void process(WorkspaceRecord record) {
-                    }
-                });
+                r.process(collector);
             }
         } catch (JournalException e1) {
             log.error(e1.getMessage(), e1);
@@ -2694,6 +2723,38 @@ public class SearchIndex extends AbstractQueryHandler {
                 records.close();
             }
         }
-        return events;
+        return collector.events;
+    }
+
+    private static class ChangeLogRecordCollector implements ClusterRecordProcessor {
+
+        private final String workspace;
+        private final List<ChangeLogRecord> events = new ArrayList<ChangeLogRecord>();
+
+        private ChangeLogRecordCollector(final String workspace) {
+            this.workspace = workspace;
+        }
+
+        public void process(ChangeLogRecord record) {
+            String eventW = record.getWorkspace();
+            if (eventW != null ? eventW.equals(workspace) : workspace == null) {
+                events.add(record);
+            }
+        }
+
+        public void process(LockRecord record) {
+        }
+
+        public void process(NamespaceRecord record) {
+        }
+
+        public void process(NodeTypeRecord record) {
+        }
+
+        public void process(PrivilegeRecord record) {
+        }
+
+        public void process(WorkspaceRecord record) {
+        }
     }
 }
