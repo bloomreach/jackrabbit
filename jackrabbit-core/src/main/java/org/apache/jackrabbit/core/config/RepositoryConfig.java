@@ -730,13 +730,9 @@ public class RepositoryConfig
         // The physical workspace home directory on disk (TODO encode name?)
         File directory = new File(workspaceDirectory, name);
 
-        // Create the physical workspace directory, fail if it exists
-        // or cannot be created
+        // Create the physical workspace directory, fail if it cannot be created
         if (!directory.mkdir()) {
-            if (directory.exists()) {
-                throw new ConfigurationException(
-                        "Workspace directory already exists: " + name);
-            } else {
+            if (!directory.exists()) {
                 throw new ConfigurationException(
                         "Failed to create workspace directory: " + name);
             }

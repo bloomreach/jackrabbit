@@ -29,6 +29,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -250,7 +251,7 @@ public class MultiIndex {
         this.excludedIDs = new HashSet<NodeId>(excludedIDs);
         this.nsMappings = handler.getNamespaceMappings();
 
-        indexNames = new IndexInfos(indexDir, "indexes");
+        indexNames = new IndexInfos(indexDir, "indexes", directoryManager);
 
         this.indexHistory = new IndexHistory(indexDir,
                 handler.getMaxHistoryAge() * 1000);
@@ -646,60 +647,63 @@ public class MultiIndex {
                         Collection<Term> deleted)
             throws IOException {
 
-        if (handler.isInitializeHierarchyCache()) {
-            // force initializing of caches
-            long time = System.currentTimeMillis();
-            index.getReadOnlyIndexReader(true).release();
-            time = System.currentTimeMillis() - time;
-            log.debug("hierarchy cache initialized in {} ms", time);
-        }
-
-        synchronized (this) {
-            synchronized (updateMonitor) {
-                updateInProgress = true;
+        // During a lucene export we do not want concurrently indexes being closed after merging
+        synchronized (luceneExportMonitor) {
+            if (handler.isInitializeHierarchyCache()) {
+                // force initializing of caches
+                long time = System.currentTimeMillis();
+                index.getReadOnlyIndexReader(true).release();
+                time = System.currentTimeMillis() - time;
+                log.debug("hierarchy cache initialized in {} ms", time);
             }
-            try {
-                // if we are reindexing there is already an active transaction
-                if (!reindexing) {
-                    executeAndLog(new Start(Action.INTERNAL_TRANS_REPL_INDEXES));
+
+            synchronized (this) {
+                synchronized (updateMonitor) {
+                    updateInProgress = true;
                 }
-                // delete obsolete indexes
-                Set<String> names = new HashSet<String>(Arrays.asList(obsoleteIndexes));
-                for (String indexName : names) {
-                    // do not try to delete indexes that are already gone
-                    if (indexNames.contains(indexName)) {
-                        executeAndLog(new DeleteIndex(getTransactionId(), indexName));
+                try {
+                    // if we are reindexing there is already an active transaction
+                    if (!reindexing) {
+                        executeAndLog(new Start(Action.INTERNAL_TRANS_REPL_INDEXES));
+                    }
+                    // delete obsolete indexes
+                    Set<String> names = new HashSet<String>(Arrays.asList(obsoleteIndexes));
+                    for (String indexName : names) {
+                        // do not try to delete indexes that are already gone
+                        if (indexNames.contains(indexName)) {
+                            executeAndLog(new DeleteIndex(getTransactionId(), indexName));
+                        }
+                    }
+
+                    // Index merger does not log an action when it creates the target
+                    // index of the merge. We have to do this here.
+                    executeAndLog(new CreateIndex(getTransactionId(), index.getName()));
+
+                    executeAndLog(new AddIndex(getTransactionId(), index.getName()));
+
+                    // delete documents in index
+                    for (Term id : deleted) {
+                        index.removeDocument(id);
+                    }
+                    index.commit();
+
+                    if (!reindexing) {
+                        // only commit if we are not reindexing
+                        // when reindexing the final commit is done at the very end
+                        executeAndLog(new Commit(getTransactionId()));
+                    }
+                } finally {
+                    synchronized (updateMonitor) {
+                        updateInProgress = false;
+                        updateMonitor.notifyAll();
+                        releaseMultiReader();
                     }
                 }
-
-                // Index merger does not log an action when it creates the target
-                // index of the merge. We have to do this here.
-                executeAndLog(new CreateIndex(getTransactionId(), index.getName()));
-
-                executeAndLog(new AddIndex(getTransactionId(), index.getName()));
-
-                // delete documents in index
-                for (Term id : deleted) {
-                    index.removeDocument(id);
-                }
-                index.commit();
-
-                if (!reindexing) {
-                    // only commit if we are not reindexing
-                    // when reindexing the final commit is done at the very end
-                    executeAndLog(new Commit(getTransactionId()));
-                }
-            } finally {
-                synchronized (updateMonitor) {
-                    updateInProgress = false;
-                    updateMonitor.notifyAll();
-                    releaseMultiReader();
-                }
             }
-        }
-        if (reindexing) {
-            // do some cleanup right away when reindexing
-            attemptDelete();
+            if (reindexing) {
+                // do some cleanup right away when reindexing
+                attemptDelete();
+            }
         }
     }
 
@@ -1375,6 +1379,23 @@ public class MultiIndex {
                 // indexingQueueCommitPending back to false
                 notifyIfIndexingQueueIsEmpty();
             }
+        }
+    }
+
+    /**
+     * Monitor to use to synchronize access on a Lucene export
+     */
+    private final Object luceneExportMonitor = new Object();
+
+    public <T> T doLockedOnLuceneExportMonitor(Callable<T> callable) throws Exception {
+        synchronized (luceneExportMonitor) {
+            return callable.call();
+        }
+    }
+
+    public synchronized <T> T doLockedOnMultiIndex(Callable<T> callable) throws Exception {
+        synchronized (updateMonitor) {
+            return callable.call();
         }
     }
 
