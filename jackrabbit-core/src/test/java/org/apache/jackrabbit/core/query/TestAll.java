@@ -68,6 +68,7 @@ public class TestAll extends TestCase {
         suite.addTestSuite(SQL2OffsetLimitTest.class);
         suite.addTestSuite(SQL2OrderByTest.class);
         suite.addTestSuite(DescendantSelfAxisTest.class);
+        suite.addTestSuite(FulltextWildcardScoringTest.class);
 
         return suite;
     }
