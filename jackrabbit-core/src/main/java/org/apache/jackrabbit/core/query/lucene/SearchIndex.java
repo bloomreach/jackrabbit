@@ -103,8 +103,6 @@ import org.apache.lucene.search.Similarity;
 import org.apache.lucene.search.Sort;
 import org.apache.lucene.search.SortField;
 import org.apache.lucene.search.TermQuery;
-import org.apache.lucene.store.Directory;
-import org.apache.lucene.store.IndexInput;
 import org.apache.lucene.util.Version;
 import org.apache.tika.config.TikaConfig;
 import org.apache.tika.fork.ForkParser;
@@ -126,27 +124,27 @@ public class SearchIndex extends AbstractQueryHandler {
      * query needs to be executed also against the /jcr:system tree.
      */
     public static final Collection<Name> VALID_SYSTEM_INDEX_NODE_TYPE_NAMES =
-            Collections.unmodifiableCollection(Arrays.asList(
-                    NameConstants.NT_CHILDNODEDEFINITION,
-                    NameConstants.NT_FROZENNODE,
-                    NameConstants.NT_NODETYPE,
-                    NameConstants.NT_PROPERTYDEFINITION,
-                    NameConstants.NT_VERSION,
-                    NameConstants.NT_VERSIONEDCHILD,
-                    NameConstants.NT_VERSIONHISTORY,
-                    NameConstants.NT_VERSIONLABELS,
-                    NameConstants.REP_NODETYPES,
-                    NameConstants.REP_SYSTEM,
-                    NameConstants.REP_VERSIONSTORAGE,
-                    // Supertypes
-                    NameConstants.NT_BASE,
-                    NameConstants.MIX_REFERENCEABLE));
-
+        Collections.unmodifiableCollection(Arrays.asList(
+                NameConstants.NT_CHILDNODEDEFINITION,
+                NameConstants.NT_FROZENNODE,
+                NameConstants.NT_NODETYPE,
+                NameConstants.NT_PROPERTYDEFINITION,
+                NameConstants.NT_VERSION,
+                NameConstants.NT_VERSIONEDCHILD,
+                NameConstants.NT_VERSIONHISTORY,
+                NameConstants.NT_VERSIONLABELS,
+                NameConstants.REP_NODETYPES,
+                NameConstants.REP_SYSTEM,
+                NameConstants.REP_VERSIONSTORAGE,
+                // Supertypes
+                NameConstants.NT_BASE,
+                NameConstants.MIX_REFERENCEABLE));
+        
     /**
      * Default query node factory.
      */
     private static final DefaultQueryNodeFactory DEFAULT_QUERY_NODE_FACTORY =
-            new DefaultQueryNodeFactory(VALID_SYSTEM_INDEX_NODE_TYPE_NAMES);
+        new DefaultQueryNodeFactory(VALID_SYSTEM_INDEX_NODE_TYPE_NAMES);
 
     /** The logger instance for this class */
     private static final Logger log = LoggerFactory.getLogger(SearchIndex.class);
@@ -390,7 +388,7 @@ public class SearchIndex extends AbstractQueryHandler {
      * Default value is: <code>false</code>.
      */
     private boolean supportHighlighting = false;
-
+    
     /**
      * If enabled, NodeIterator.getSize() may report a larger value than the
      * actual result. This value may shrink when the query result encounters
@@ -585,7 +583,7 @@ public class SearchIndex extends AbstractQueryHandler {
             }
 
             final ClusterNode clusterNode = getContext().getClusterNode();
-            if (clusterNode != null) {
+            if (clusterNode != null ) {
                 // it is safe to set the local revision equal to the global revision
                 // because there is an entire index recreation. If we don't do this, after the index creation,
                 // all documents after the local revision get again removed from the index and then later added again
@@ -615,7 +613,7 @@ public class SearchIndex extends AbstractQueryHandler {
                             long indexRevisionBefore = Long.parseLong(indexRevisionProperties.getProperty("indexRevisionBefore"));
                             long indexRevisionAfter = Long.parseLong(indexRevisionProperties.getProperty("indexRevisionAfter"));
 
-                            undoAdded(indexRevisionBefore, indexRevisionAfter, context);
+                            undoAdded(indexRevisionBefore, indexRevisionAfter, context, true);
                             clusterNode.setRevision(indexRevisionBefore);
                         }
                     } catch (NumberFormatException e) {
@@ -633,7 +631,6 @@ public class SearchIndex extends AbstractQueryHandler {
                     indexRevisionFile.delete();
                 }
             }
-
         }
         if (consistencyCheckEnabled
                 && (index.getRedoLogApplied() || forceConsistencyCheck)) {
@@ -663,7 +660,7 @@ public class SearchIndex extends AbstractQueryHandler {
                 new Object[]{path, index.getIndexFormatVersion()});
         if (!index.getIndexFormatVersion().equals(getIndexFormatVersion())) {
             log.warn("Using Version {} for reading. Please re-index version " +
-                            "storage for optimal performance.",
+                    "storage for optimal performance.",
                     getIndexFormatVersion().getVersion());
         }
     }
@@ -750,7 +747,7 @@ public class SearchIndex extends AbstractQueryHandler {
         // update aggregates if there are any affected
         if (!aggregateRoots.isEmpty()) {
             Collection<Document> modified =
-                    new ArrayList<Document>(aggregateRoots.size());
+                new ArrayList<Document>(aggregateRoots.size());
 
             for (NodeState state : aggregateRoots.values()) {
                 try {
@@ -909,7 +906,7 @@ public class SearchIndex extends AbstractQueryHandler {
      * @param orderSpecs      the order specs for the sort order properties.
      *                        <code>true</code> indicates ascending order,
      *                        <code>false</code> indicates descending.
-     * @param orderFuncs      functions for the properties for sort order.
+     * @param orderFuncs      functions for the properties for sort order. 
      * @param resultFetchHint a hint on how many results should be fetched.  @return the query hits.
      * @throws IOException if an error occurs while searching the index.
      */
@@ -1238,7 +1235,7 @@ public class SearchIndex extends AbstractQueryHandler {
      *
      * @param orderProps the order properties.
      * @param orderSpecs the order specs for the properties.
-     * @param orderFuncs the functions for the properties.
+     * @param orderFuncs the functions for the properties. 
      * @return an array of sort fields
      */
     protected SortField[] createSortFields(Path[] orderProps,
@@ -1433,7 +1430,7 @@ public class SearchIndex extends AbstractQueryHandler {
             if (synonymProviderConfigPath.endsWith(FileSystem.SEPARATOR)) {
                 throw new FileSystemException(
                         "Invalid synonymProviderConfigPath: "
-                                + synonymProviderConfigPath);
+                        + synonymProviderConfigPath);
             }
             if (fs == null) {
                 fs = new LocalFileSystem();
@@ -1520,10 +1517,10 @@ public class SearchIndex extends AbstractQueryHandler {
 
             if (configStream != null) {
                 indexingConfiguration = builder
-                        .parse(configStream).getDocumentElement();
+                    .parse(configStream).getDocumentElement();
             } else {
                 indexingConfiguration = builder
-                        .parse(config).getDocumentElement();
+                    .parse(config).getDocumentElement();
             }
         } catch (ParserConfigurationException e) {
             log.warn("Unable to create XML parser", e);
@@ -1720,14 +1717,14 @@ public class SearchIndex extends AbstractQueryHandler {
      * @param aggregates aggregate roots are collected in this map.
      */
     protected void retrieveAggregateRoot(NodeState state,
-                                         Map<NodeId, NodeState> aggregates) {
+            Map<NodeId, NodeState> aggregates) {
         retrieveAggregateRoot(state, aggregates, state.getNodeId().toString(), 0);
     }
-
+    
     /**
      * Retrieves the root of the indexing aggregate for <code>state</code> and
      * puts it into <code>aggregates</code> map.
-     *
+     * 
      * @param state
      *            the node state for which we want to retrieve the aggregate
      *            root.
@@ -1740,7 +1737,7 @@ public class SearchIndex extends AbstractQueryHandler {
      *            of nodes that have the same type
      */
     private void retrieveAggregateRoot(NodeState state,
-                                       Map<NodeId, NodeState> aggregates, String originNodeId, long level) {
+            Map<NodeId, NodeState> aggregates, String originNodeId, long level) {
         if (indexingConfig == null) {
             return;
         }
@@ -1767,7 +1764,7 @@ public class SearchIndex extends AbstractQueryHandler {
             // JCR-2989 Support for embedded index aggregates
             if ((aggregateRule.getRecursiveAggregationLimit() == 0)
                     || (aggregateRule.getRecursiveAggregationLimit() != 0 && level <= aggregateRule
-                    .getRecursiveAggregationLimit())) {
+                            .getRecursiveAggregationLimit())) {
 
                 // check if the update parent is already in the
                 // map, then all its parents are already there so I can
@@ -1806,13 +1803,13 @@ public class SearchIndex extends AbstractQueryHandler {
             CachingMultiIndexReader reader = index.getIndexReader();
             try {
                 Term aggregateIds =
-                        new Term(FieldNames.AGGREGATED_NODE_UUID, "");
+                    new Term(FieldNames.AGGREGATED_NODE_UUID, "");
                 TermDocs tDocs = reader.termDocs();
                 try {
                     ItemStateManager ism = getContext().getItemStateManager();
                     for (NodeId id : removedIds) {
                         aggregateIds =
-                                aggregateIds.createTerm(id.toString());
+                            aggregateIds.createTerm(id.toString());
                         tDocs.seek(aggregateIds);
                         while (tDocs.next()) {
                             Document doc = reader.document(
@@ -1866,7 +1863,7 @@ public class SearchIndex extends AbstractQueryHandler {
         }
 
         /**
-         * @inheritDoc
+         * {@inheritDoc}
          */
         public int[] getParents(int n, int[] docNumbers) throws IOException {
             int i = readerIndex(n);
@@ -2147,12 +2144,12 @@ public class SearchIndex extends AbstractQueryHandler {
      * Sets the list of text extractors (and text filters) to use for
      * extracting text content from binary properties. The list must be
      * comma (or whitespace) separated, and contain fully qualified class
-     * names of the {@link TextExtractor} (and {@link org.apache.jackrabbit.core.query.TextFilter}) classes
+     * names of the {@code TextExtractor} (and {@code org.apache.jackrabbit.core.query.TextFilter}) classes
      * to be used. The configured classes must all have a public default
      * constructor.
      *
      * @param filterClasses comma separated list of class names
-     * @deprecated
+     * @deprecated 
      */
     public void setTextFilterClasses(String filterClasses) {
         log.warn("The textFilterClasses configuration parameter has"
@@ -2165,7 +2162,7 @@ public class SearchIndex extends AbstractQueryHandler {
      * currently in use. The names are comma separated.
      *
      * @return class names of the text filters in use.
-     * @deprecated
+     * @deprecated 
      */
     public String getTextFilterClasses() {
         return "deprectated";
@@ -2242,13 +2239,13 @@ public class SearchIndex extends AbstractQueryHandler {
     public long getExtractorTimeout() {
         return extractorTimeout;
     }
-
+    
     /**
      * If enabled, NodeIterator.getSize() may report a larger value than the
      * actual result. This value may shrink when the query result encounters
      * non-existing nodes or the session does not have access to a node. This
      * might be a security problem.
-     *
+     * 
      * @param b <code>true</code> to enable
      */
     public void setSizeEstimate(boolean b) {
@@ -2257,10 +2254,10 @@ public class SearchIndex extends AbstractQueryHandler {
         }
         this.sizeEstimate = b;
     }
-
+    
     /**
      * Get the size estimate setting.
-     *
+     * 
      * @return the setting
      */
     public boolean getSizeEstimate() {
@@ -2343,7 +2340,7 @@ public class SearchIndex extends AbstractQueryHandler {
                 indexingConfigurationClass = clazz;
             } else {
                 log.warn("Invalid value for indexingConfigurationClass, {} "
-                                + "does not implement IndexingConfiguration interface.",
+                        + "does not implement IndexingConfiguration interface.",
                         className);
             }
         } catch (ClassNotFoundException e) {
@@ -2373,7 +2370,7 @@ public class SearchIndex extends AbstractQueryHandler {
                 synonymProviderClass = clazz;
             } else {
                 log.warn("Invalid value for synonymProviderClass, {} "
-                                + "does not implement SynonymProvider interface.",
+                        + "does not implement SynonymProvider interface.",
                         className);
             }
         } catch (ClassNotFoundException e) {
@@ -2407,7 +2404,7 @@ public class SearchIndex extends AbstractQueryHandler {
                 spellCheckerClass = clazz;
             } else {
                 log.warn("Invalid value for spellCheckerClass, {} "
-                                + "does not implement SpellChecker interface.",
+                        + "does not implement SpellChecker interface.",
                         className);
             }
         } catch (ClassNotFoundException e) {
@@ -2612,9 +2609,9 @@ public class SearchIndex extends AbstractQueryHandler {
      * In the case of an initial index build operation, this checks if there are
      * some new nodes pending in the journal and tries to preemptively delete
      * them, to keep the index consistent.
-     *
+     * 
      * See JCR-3162
-     *
+     * 
      * @param context
      * @throws IOException
      */
@@ -2623,21 +2620,13 @@ public class SearchIndex extends AbstractQueryHandler {
         if (cn == null) {
             return;
         }
-        undoAdded(cn.getRevision(), -1, context);
+        undoAdded(cn.getRevision(), -1, context, false);
     }
 
-    private void undoAdded(final long fromRevision, final long toRevision, final QueryHandlerContext context) {
+    private void undoAdded(final long fromRevision, final long toRevision, final QueryHandlerContext context,
+                           final boolean fatalOnRevisionCheck) {
         Collection<NodeId> added = new ArrayList<NodeId>();
-        List<ChangeLogRecord> records = getChangeLogRecords(fromRevision, toRevision, context.getWorkspace());
-        if (!records.isEmpty()) {
-            long startRevisionJournalTable = records.get(0).getRevision();
-            if (startRevisionJournalTable > (fromRevision + 1)) {
-                throw new IllegalStateException(String.format("Required start revision '%s' does NOT exist any more in the " +
-                        "Journal table (oldest journal table record has revision '%s') implying the index cannot be correctly updated. Remove the index and restart to " +
-                        "trigger a complete new index built or provide a newer index export.", fromRevision + 1, startRevisionJournalTable));
-            }
-        }
-
+        List<ChangeLogRecord> records = getChangeLogRecords(fromRevision, toRevision, context.getWorkspace(), fatalOnRevisionCheck);
         for (ChangeLogRecord record : records) {
             ChangeLog changes = record.getChanges();
             for (ItemState state : changes.addedStates()) {
@@ -2681,7 +2670,7 @@ public class SearchIndex extends AbstractQueryHandler {
      * @return
      */
     private List<ChangeLogRecord> getChangeLogRecords(long fromRevision, long toRevision,
-                                                      final String workspace) {
+            final String workspace, final boolean fatalOnRevisionCheck) {
         log.debug(
                 "Get changes from the Journal from revision {} to revision {} in workspace {}.",
                 new Object[] { fromRevision, toRevision, workspace });
@@ -2695,8 +2684,23 @@ public class SearchIndex extends AbstractQueryHandler {
         RecordIterator records = null;
         try {
             records = journal.getRecords(fromRevision);
+            boolean first = true;
             while (records.hasNext()) {
                 Record record = records.nextRecord();
+                if (first) {
+                    long startRevisionJournalTable = record.getRevision() ;
+                    if (startRevisionJournalTable > (fromRevision + 1)) {
+                        String msg = String.format("Required start revision '%s' does NOT exist any more in the " +
+                                "Journal table (oldest journal table record has revision '%s') implying the index cannot be correctly updated. Remove the index and restart to " +
+                                "trigger a complete new index built or provide a newer index export.", fromRevision + 1, startRevisionJournalTable);
+                        if (fatalOnRevisionCheck) {
+                            throw new IllegalStateException(msg);
+                        } else {
+                            log.error(msg);
+                        }
+                    }
+                }
+                first = false;
                 if (toRevision != -1 && record.getRevision() > toRevision) {
                     break;
                 }
@@ -2756,6 +2760,5 @@ public class SearchIndex extends AbstractQueryHandler {
 
         public void process(WorkspaceRecord record) {
         }
-
     }
 }
