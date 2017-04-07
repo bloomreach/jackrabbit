@@ -613,7 +613,7 @@ public class SearchIndex extends AbstractQueryHandler {
                             long indexRevisionBefore = Long.parseLong(indexRevisionProperties.getProperty("indexRevisionBefore"));
                             long indexRevisionAfter = Long.parseLong(indexRevisionProperties.getProperty("indexRevisionAfter"));
 
-                            undoAdded(indexRevisionBefore, indexRevisionAfter, context);
+                            undoAdded(indexRevisionBefore, indexRevisionAfter, context, true);
                             clusterNode.setRevision(indexRevisionBefore);
                         }
                     } catch (NumberFormatException e) {
@@ -2620,21 +2620,13 @@ public class SearchIndex extends AbstractQueryHandler {
         if (cn == null) {
             return;
         }
-        undoAdded(cn.getRevision(), -1, context);
+        undoAdded(cn.getRevision(), -1, context, false);
     }
 
-    private void undoAdded(final long fromRevision, final long toRevision, final QueryHandlerContext context) {
+    private void undoAdded(final long fromRevision, final long toRevision, final QueryHandlerContext context,
+                           final boolean fatalOnRevisionCheck) {
         Collection<NodeId> added = new ArrayList<NodeId>();
-        List<ChangeLogRecord> records = getChangeLogRecords(fromRevision, toRevision, context.getWorkspace());
-        if (!records.isEmpty()) {
-            long startRevisionJournalTable = records.get(0).getRevision();
-            if (startRevisionJournalTable > (fromRevision + 1)) {
-                throw new IllegalStateException(String.format("Required start revision '%s' does NOT exist any more in the " +
-                        "Journal table (oldest journal table record has revision '%s') implying the index cannot be correctly updated. Remove the index and restart to " +
-                        "trigger a complete new index built or provide a newer index export.", fromRevision + 1, startRevisionJournalTable));
-            }
-        }
-
+        List<ChangeLogRecord> records = getChangeLogRecords(fromRevision, toRevision, context.getWorkspace(), fatalOnRevisionCheck);
         for (ChangeLogRecord record : records) {
             ChangeLog changes = record.getChanges();
             for (ItemState state : changes.addedStates()) {
@@ -2678,7 +2670,7 @@ public class SearchIndex extends AbstractQueryHandler {
      * @return
      */
     private List<ChangeLogRecord> getChangeLogRecords(long fromRevision, long toRevision,
-            final String workspace) {
+            final String workspace, final boolean fatalOnRevisionCheck) {
         log.debug(
                 "Get changes from the Journal from revision {} to revision {} in workspace {}.",
                 new Object[] { fromRevision, toRevision, workspace });
@@ -2692,8 +2684,23 @@ public class SearchIndex extends AbstractQueryHandler {
         RecordIterator records = null;
         try {
             records = journal.getRecords(fromRevision);
+            boolean first = true;
             while (records.hasNext()) {
                 Record record = records.nextRecord();
+                if (first) {
+                    long startRevisionJournalTable = record.getRevision() ;
+                    if (startRevisionJournalTable > (fromRevision + 1)) {
+                        String msg = String.format("Required start revision '%s' does NOT exist any more in the " +
+                                "Journal table (oldest journal table record has revision '%s') implying the index cannot be correctly updated. Remove the index and restart to " +
+                                "trigger a complete new index built or provide a newer index export.", fromRevision + 1, startRevisionJournalTable);
+                        if (fatalOnRevisionCheck) {
+                            throw new IllegalStateException(msg);
+                        } else {
+                            log.error(msg);
+                        }
+                    }
+                }
+                first = false;
                 if (toRevision != -1 && record.getRevision() > toRevision) {
                     break;
                 }
