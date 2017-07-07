@@ -40,6 +40,8 @@ public abstract class ItemData {
     /** Associated item definition */
     private ItemDefinition definition;
 
+    private short modCount;
+
     /** Status */
     private int status;
 
@@ -94,12 +96,13 @@ public abstract class ItemData {
      * @throws RepositoryException if the definition cannot be retrieved.
      */
     public ItemDefinition getDefinition() throws RepositoryException {
-        if (definition == null && itemMgr != null) {
+        if (definition == null && itemMgr != null || state.getModCount() != modCount) {
             if (isNode()) {
                 definition = itemMgr.getDefinition((NodeState) state);
             } else {
                 definition = itemMgr.getDefinition((PropertyState) state);
             }
+            modCount = state.getModCount();
         }
         return definition;
     }
