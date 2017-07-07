@@ -96,7 +96,7 @@ public abstract class ItemData {
      * @throws RepositoryException if the definition cannot be retrieved.
      */
     public ItemDefinition getDefinition() throws RepositoryException {
-        if (definition == null && itemMgr != null || state.getModCount() != modCount) {
+        if ((definition == null || state.getModCount() != modCount) && itemMgr != null) {
             if (isNode()) {
                 definition = itemMgr.getDefinition((NodeState) state);
             } else {
