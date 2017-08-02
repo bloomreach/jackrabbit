@@ -18,6 +18,7 @@ package org.apache.jackrabbit.core.version;
 
 import java.util.Calendar;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -167,7 +168,11 @@ class InternalVersionHistoryImpl extends InternalVersionItemImpl
     // fix legacy
     private void fixLegacy() throws RepositoryException {
         if (rootVersion.getSuccessors().isEmpty()) {
-            for (Name versionName : nameCache.keySet()) {
+            HashSet<Name> names;
+            synchronized (this) {
+                names = new HashSet<>(nameCache.keySet());;
+            }
+            for (Name versionName : names) {
                 InternalVersionImpl v = createVersionInstance(versionName);
                 v.legacyResolveSuccessors();
             }
