@@ -63,6 +63,7 @@
     <java.version.signature>java18</java.version.signature>
     <skip.coverage>true</skip.coverage>
     <jacoco.version>0.7.9</jacoco.version>
+    <maven.plugin.source.version>3.0.1</maven.plugin.source.version>
   </properties>
 
   <url>http://jackrabbit.apache.org/</url>
@@ -278,6 +279,11 @@
            </execution>
          </executions>
       </plugin>
+      <plugin>
+        <inherited>true</inherited>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-source-plugin</artifactId>
+      </plugin>
     </plugins>
     <pluginManagement>
       <!-- JCRSITE-9: Fix versions of key Maven plugins      -->
@@ -358,6 +364,25 @@
           <groupId>org.codehaus.mojo</groupId>
           <artifactId>cobertura-maven-plugin</artifactId>
           <version>2.7</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-source-plugin</artifactId>
+          <version>${maven.plugin.source.version}</version>
+          <inherited>true</inherited>
+          <executions>
+            <execution>
+              <id>attach-sources</id>
+              <phase>DISABLE_FORKED_LIFECYCLE_MSOURCES-13</phase>
+            </execution>
+            <execution>
+              <id>attach-sources-no-fork</id>
+              <inherited>true</inherited>
+              <goals>
+                <goal>jar-no-fork</goal>
+              </goals>
+            </execution>
+          </executions>
         </plugin>
       </plugins>
     </pluginManagement>
