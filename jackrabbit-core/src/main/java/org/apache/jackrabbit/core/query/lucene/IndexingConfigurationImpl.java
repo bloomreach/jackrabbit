@@ -345,19 +345,25 @@ public class IndexingConfigurationImpl
         for (int i = 0; i < indexingConfigs.getLength(); i++) {
             Node configNode = indexingConfigs.item(i);
             if (configNode.getNodeName().equals("index-rule")) {
-                IndexingRule element = new IndexingRule(configNode);
-                // register under node type and all its sub types
-                log.debug("Found rule '{}' for NodeType '{}'", element, element.getNodeTypeName());
-                for (Name ntName : ntNames) {
-                    if (ntReg.getEffectiveNodeType(ntName).includesNodeType(element.getNodeTypeName())) {
-                        List<IndexingRule> perNtConfig = nt2rules.get(ntName);
-                        if (perNtConfig == null) {
-                            perNtConfig = new ArrayList<IndexingRule>();
-                            nt2rules.put(ntName, perNtConfig);
+                try {
+                    IndexingRule element = new IndexingRule(configNode);
+
+                    // register under node type and all its sub types
+                    log.debug("Found rule '{}' for NodeType '{}'", element, element.getNodeTypeName());
+                    for (Name ntName : ntNames) {
+                        if (ntReg.getEffectiveNodeType(ntName).includesNodeType(element.getNodeTypeName())) {
+                            List<IndexingRule> perNtConfig = nt2rules.get(ntName);
+                            if (perNtConfig == null) {
+                                perNtConfig = new ArrayList<IndexingRule>();
+                                nt2rules.put(ntName, perNtConfig);
+                            }
+                            log.debug("Registering it for name '{}'", ntName);
+                            perNtConfig.add(new IndexingRule(element, ntReg.getNodeTypeDef(ntName)));
                         }
-                        log.debug("Registering it for name '{}'", ntName);
-                        perNtConfig.add(new IndexingRule(element, ntReg.getNodeTypeDef(ntName)));
                     }
+                } catch (NoSuchNodeTypeException nsnte) {
+                    log.debug("Skipping index-rule for undefined NodeType '{}'",
+                            configNode.getAttributes().getNamedItem("nodeType").getNodeValue());
                 }
             }
         }
