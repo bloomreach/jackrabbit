@@ -106,6 +106,35 @@ public class IndexingConfigurationImplTest extends AbstractIndexingTest {
         assertTrue(config.isIndexed(nState, NameConstants.JCR_UUID)); // from mixReferenceable ... should be indexed
     }
 
+    public void testIndexRuleUnregisteredNodeType() throws Exception {
+        final Name CUSTOM_NODE_TYPE = NameFactoryImpl.getInstance().create(Name.NS_DEFAULT_URI, "customNodeType");
+        final Name CUSTOM_NODE_PROP = NameFactoryImpl.getInstance().create(Name.NS_DEFAULT_URI, "customProperty");
+
+        NodeTypeManager ntMgr = session.getWorkspace().getNodeTypeManager();
+        // skip test if customNodeType already registered as unregisterNodeType isn't supported in default Jackrabbit
+        if (!ntMgr.hasNodeType(CUSTOM_NODE_TYPE.toString())) {
+
+            // load indexing config with index-rule for not-yet-registered customNodeType: this failed before this fix
+            IndexingConfiguration config = createConfig("config6");
+
+            // register customNodeType, this will (now) trigger loading the indexing rule for the customNodeType
+            NodeTypeTemplate ntTemplate = ntMgr.createNodeTypeTemplate();
+            ntTemplate.setName(CUSTOM_NODE_TYPE.toString());
+            ntTemplate.setDeclaredSuperTypeNames(new String[]{ntUnstructured});
+            ntMgr.registerNodeType(ntTemplate, false);
+
+            // create customNode with customNodeType and customProperty
+            Node customNode = testRootNode.addNode("customNode", "customNodeType");
+            customNode.setProperty("customProperty", "test");
+            session.save();
+            NodeState customNodeState = (NodeState) getSearchIndex().getContext().getItemStateManager().getItemState(
+                    new NodeId(customNode.getIdentifier()));
+
+            // test the customProperty of customNodeType is indexed
+            assertTrue(config.isIndexed(customNodeState, CUSTOM_NODE_PROP));
+        }
+    }
+
     //----------------------------< internal >----------------------------------
     protected IndexingConfiguration createConfig(String name) throws Exception {
         IndexingConfiguration config = new IndexingConfigurationImpl();
