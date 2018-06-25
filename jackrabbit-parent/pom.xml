@@ -56,6 +56,7 @@
     <java.version.signature>java18</java.version.signature>
     <skip.coverage>true</skip.coverage>
     <jacoco.version>0.8.1</jacoco.version>
+    <maven.plugin.source.version>3.0.1</maven.plugin.source.version>
   </properties>
 
   <url>http://jackrabbit.apache.org/</url>
