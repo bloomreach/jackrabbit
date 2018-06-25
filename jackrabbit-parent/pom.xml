@@ -77,6 +77,21 @@
     <maven>3.2.1</maven>
   </prerequisites>
 
+  <distributionManagement>
+    <repository>
+      <name>Hippo Maven 2 Enterprise Repository</name>
+      <id>hippo-maven2-enterprise</id>
+      <url>https://maven.onehippo.com/content/repositories/enterprise-releases/</url>
+      <uniqueVersion>false</uniqueVersion>
+    </repository>
+    <snapshotRepository>
+      <name>Hippo Maven 2 Enterprise Snapshots</name>
+      <id>hippo-maven2-enterprise-snapshots</id>
+      <url>https://maven.onehippo.com/content/repositories/enterprise-snapshots/</url>
+      <uniqueVersion>false</uniqueVersion>
+    </snapshotRepository>
+  </distributionManagement>
+
   <profiles>
     <profile>
       <id>pedantic</id>
