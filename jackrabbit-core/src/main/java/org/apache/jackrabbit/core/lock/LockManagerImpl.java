@@ -124,11 +124,42 @@ public class LockManagerImpl
     private LockEventChannel eventChannel;
 
     /**
-     * Create a new instance of this class.
+     * Jackrabbit LockManagerImpl constructor which only installs the original background TimeoutHandler if the
+     * provided ScheduledExecutorService parameter is not null.
      *
+     * <p>
+     *     When the provided ScheduledExecutorService parameter is not null, the original Jackrabbit LockManagerImpl
+     *     behavior is retained using a background TimeoutHandler for cleanup of expired locks (in a local repository
+     *     instance only!).
+     * </p>
+     * <p>
+     *     When the ScheduledExecutorService parameter is null, the Hippo REPO-1381/REPO-1645 functionality is activated
+     *     with 'just-in-time' lock expiration through the custom HippoLock (hippo:lockable) in Hippo CMS <= v12.
+     * </p>
+     * <p>
+     *     The 'just-in-time' lock expiration feature however has been deprecated and removed again in Hippo CMS v13+,
+     *     replaced with the new non-JCR based Hippo LockManager service of CMS-10897/REPO-1811 so JCR locking no longer
+     *     is (and should) be needed at all! In Hippo CMS v13+ therefore the original Jackrabbit LockManagerImpl behavior
+     *     is restored by (again) providing the ScheduledExecutorService parameter value.
+     * </p>
+     * <p>
+     *     The original Jackrabbit TimeoutHandler solution however is brittle (it uses not thread-safe JCR session access)
+     *     and limited in capabilities (only can cleanup expired locks created in the local repository cluster instance).
+     *     Therefore using JCR locking in general should be avoided. Instead the non-JCR based Hippo LockManager service
+     *     feature (CMS-10897/REPO-1811) should be used as a more robust and cluster-wide reliable alternative.
+     * </p>
+     * <p>
+     *     Developerment NOTICE: when changes are merged or applied to this class, the Hippo Jackrabbit test build must
+     *     be executed *twice* to verify the two different usage scenarios:
+     *     - once with the default Jackrabbit provided ScheduledExecutorService parameter (original behavior)
+     *     - once with the ScheduledExecutorService parameter nullified (in the method body), by <em>temporarily</em>
+     *       adding:
+     *          executor = null;
+     *       on the first line inside the body of the constructor, and removing it again after the test build!
+     * </p>
      * @param session  system session
      * @param fs       file system for persisting locks
-     * @param executor scheduled executor service for handling lock timeouts
+     * @param executor scheduled executor service for handling lock timeouts, if not null
      * @throws RepositoryException if an error occurs
      */
     public LockManagerImpl(
@@ -151,15 +182,26 @@ public class LockManagerImpl
                     + locksFile.getPath() + "'", e);
         }
 
-        timeoutHandler = executor.scheduleWithFixedDelay(
-                new TimeoutHandler(), 1, 1, TimeUnit.SECONDS);
+        timeoutHandler = executor == null
+                ? null
+                : executor.scheduleWithFixedDelay(new TimeoutHandler(), 1, 1, TimeUnit.SECONDS);
+    }
+
+    /**
+     * @param info lockInfo pro-active live check, or ignore (return true) when using scheduled TimeoutHandler
+     * @return true when using TimeoutHandler to cleanup locks (lazily), or when lockInfo is not expired (active check)
+     */
+    private boolean lazyIsLive(LockInfo info) {
+        return timeoutHandler != null || info.isLive();
     }
 
     /**
      * Close this lock manager. Writes back all changes.
      */
     public void close() {
-        timeoutHandler.cancel(false);
+        if (timeoutHandler != null) {
+            timeoutHandler.cancel(false);
+        }
         save();
     }
 
@@ -356,7 +398,7 @@ public class LockManagerImpl
             PathMap.Element<LockInfo> element = lockMap.map(path, false);
 
             LockInfo other = element.get();
-            if (other != null) {
+            if (other != null && lazyIsLive(other)) {
                 if (element.hasPath(path)) {
                     other.throwLockException(
                             "Node already locked: " + node, session);
@@ -367,7 +409,21 @@ public class LockManagerImpl
             }
             if (info.isDeep() && element.hasPath(path)
                     && element.getChildrenCount() > 0) {
-                info.throwLockException("Some child node is locked", session);
+                if (timeoutHandler == null) {
+                    boolean childLocked = false;
+                    for (PathMap.Element<LockInfo> child : element.getChildren()) {
+                        final LockInfo childLockInfo = child.get();
+                        if (childLockInfo != null && childLockInfo.isLive()) {
+                            childLocked = true;
+                            break;
+                        }
+                    }
+                    if (childLocked) {
+                        info.throwLockException("Some child node is locked", session);
+                    }
+                } else {
+                    info.throwLockException("Some child node is locked", session);
+                }
             }
 
             // create lock token
@@ -506,7 +562,7 @@ public class LockManagerImpl
         try {
             PathMap.Element<LockInfo> element = lockMap.map(path, false);
             LockInfo info = element.get();
-            if (info != null) {
+            if (info != null && lazyIsLive(info)) {
                 if (element.hasPath(path) || info.isDeep()) {
                     return info;
                 }
@@ -549,7 +605,7 @@ public class LockManagerImpl
 
             PathMap.Element<LockInfo> element = lockMap.map(path, false);
             LockInfo info = element.get();
-            if (info != null && (element.hasPath(path) || info.isDeep())) {
+            if (info != null && lazyIsLive(info) && (element.hasPath(path) || info.isDeep())) {
                 NodeImpl lockHolder = (NodeImpl)
                     session.getItemManager().getItem(info.getId());
                 return new LockImpl(info, lockHolder);
@@ -610,7 +666,8 @@ public class LockManagerImpl
             if (element == null) {
                 return false;
             }
-            return element.get() != null;
+            final LockInfo lockInfo = element.get();
+            return lockInfo != null && lazyIsLive(lockInfo);
         } catch (ItemNotFoundException e) {
             return false;
         } finally {
@@ -631,6 +688,9 @@ public class LockManagerImpl
             PathMap.Element<LockInfo> element = lockMap.map(path, false);
             LockInfo info = element.get();
             if (info == null) {
+                return false;
+            }
+            if (!lazyIsLive(info)) {
                 return false;
             }
             if (element.hasPath(path)) {
@@ -690,7 +750,7 @@ public class LockManagerImpl
     protected void checkLock(LockInfo info, Session session)
             throws LockException, RepositoryException {
 
-        if (!info.isLockHolder(session)) {
+        if (lazyIsLive(info) && !info.isLockHolder(session)) {
             throw new LockException("Node locked.");
         }
     }
@@ -754,7 +814,7 @@ public class LockManagerImpl
             PathMap.Element<LockInfo> element = lockMap.map(path, true);
             if (element != null) {
                 LockInfo info = element.get();
-                if (info != null && !info.isLockHolder(session)) {
+                if (info != null && lazyIsLive(info) && !info.isLockHolder(session)) {
                     if (info.getLockHolder() == null) {
                         info.setLockHolder(session);
                         if (info instanceof InternalLockInfo) {
@@ -794,7 +854,7 @@ public class LockManagerImpl
                 lockMap.map(node.getPrimaryPath(), true);
             if (element != null) {
                 LockInfo info = element.get();
-                if (info != null) {
+                if (info != null && lazyIsLive(info)) {
                     if (info.isLockHolder(session)) {
                         info.setLockHolder(null);
                     } else if (info.getLockHolder() != null) {
@@ -1101,15 +1161,19 @@ public class LockManagerImpl
      */
     public void onEvent(EventIterator events) {
         Iterator<HierarchyEvent> iter = consolidateEvents(events);
+        boolean needsSave = false;
         while (iter.hasNext()) {
             HierarchyEvent event = iter.next();
             if (event.type == Event.NODE_ADDED) {
-                nodeAdded(event.path);
+                needsSave |= nodeAdded(event.path);
             } else if (event.type == Event.NODE_REMOVED) {
-                nodeRemoved(event.path);
+                needsSave |= nodeRemoved(event.path);
             } else if (event.type == (Event.NODE_ADDED | Event.NODE_REMOVED)) {
-                nodeMoved(event.getOldPath(), event.getNewPath());
+                needsSave |= nodeMoved(event.getOldPath(), event.getNewPath());
             }
+        }
+        if (needsSave) {
+            save();
         }
     }
 
@@ -1151,7 +1215,7 @@ public class LockManagerImpl
      * Refresh a non-empty path element whose children might have changed
      * its position.
      */
-    private void refresh(PathMap.Element<LockInfo> element) {
+    private boolean refresh(PathMap.Element<LockInfo> element) {
         final ArrayList<LockInfo> infos = new ArrayList<LockInfo>();
         boolean needsSave = false;
 
@@ -1185,10 +1249,7 @@ public class LockManagerImpl
             }
         }
 
-        // save if required
-        if (needsSave) {
-            save();
-        }
+        return needsSave;
     }
 
     /**
@@ -1198,20 +1259,21 @@ public class LockManagerImpl
      *
      * @param path path of added node
      */
-    private void nodeAdded(Path path) {
+    private boolean nodeAdded(Path path) {
         acquire();
 
         try {
             PathMap.Element<LockInfo> parent =
                 lockMap.map(path.getAncestor(1), true);
             if (parent != null) {
-                refresh(parent);
+                return refresh(parent);
             }
         } catch (RepositoryException e) {
             log.warn("Unable to determine path of added node's parent.", e);
         } finally {
             release();
         }
+        return false;
     }
 
     /**
@@ -1221,20 +1283,21 @@ public class LockManagerImpl
      * @param oldPath old path
      * @param newPath new path
      */
-    private void nodeMoved(Path oldPath, Path newPath) {
+    private boolean nodeMoved(Path oldPath, Path newPath) {
         acquire();
 
         try {
             PathMap.Element<LockInfo> parent =
                 lockMap.map(oldPath.getAncestor(1), true);
             if (parent != null) {
-                refresh(parent);
+                return refresh(parent);
             }
         } catch (RepositoryException e) {
             log.warn("Unable to determine path of moved node's parent.", e);
         } finally {
             release();
         }
+        return false;
     }
 
     /**
@@ -1243,20 +1306,21 @@ public class LockManagerImpl
      *
      * @param path path of removed node
      */
-    private void nodeRemoved(Path path) {
+    private boolean nodeRemoved(Path path) {
         acquire();
 
         try {
             PathMap.Element<LockInfo> parent =
                 lockMap.map(path.getAncestor(1), true);
             if (parent != null) {
-                refresh(parent);
+                return refresh(parent);
             }
         } catch (RepositoryException e) {
             log.warn("Unable to determine path of removed node's parent.", e);
         } finally {
             release();
         }
+        return false;
     }
 
     /**
@@ -1277,6 +1341,53 @@ public class LockManagerImpl
         public InternalLockInfo(NodeId lockToken, boolean sessionScoped,
                                 boolean deep, String lockOwner, long timeoutHint) {
             super(lockToken, sessionScoped, deep, lockOwner, timeoutHint);
+        }
+
+        /**
+         * If no timeouthandler is installed, unlocks expired lock before reporting the live state
+         * @return super.isLive() if no timeouthandler is installed, else: <code>true</code> if the lock is live; otherwise <code>false</code>
+         */
+        @Override
+        public boolean isLive() {
+            if (timeoutHandler != null) {
+                return super.isLive();
+            }
+            if (super.mayChange()) {
+                if (isExpired()) {
+                    // unlock
+                    final NodeId id = getId();
+                    SessionImpl holder = getLockHolder();
+                    if (holder == null) {
+                        setLockHolder(sysSession);
+                        holder = sysSession;
+                    }
+                    try {
+                        log.debug("Trying to unlock expired lock. NodeId {}", id);
+                        unlock(holder.getNodeById(id));
+                    } catch (RepositoryException e) {
+                        log.warn("Unable to unlock expired lock. NodeId " + id, e);
+                    }
+                    return super.mayChange();
+                }
+                return true;
+            }
+            return false;
+        }
+
+        /**
+         * If no timeouthandler is installed, unlocks expired lock before reporting if the lock information may still change
+         *
+         * The super method simply returns the (internal) live state, therefore we need to delegate to our {@link #isLive()}
+         * method instead.
+         *
+         * @return super.mayChange() if no timeouthandler is installed, else: <code>true</code> if the lock information may still change; otherwise <code>false</code>
+         */
+        @Override
+        public boolean mayChange() {
+            if (timeoutHandler != null) {
+                return super.mayChange();
+            }
+            return isLive();
         }
 
         /**
