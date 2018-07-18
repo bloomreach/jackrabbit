@@ -94,7 +94,7 @@ public class IndexingConfigurationImpl
         EMPTY_NODESTATE_ITERATOR = empty.iterator();
     }
 
-    
+
     /**
      * The indexing configuration.
      */
@@ -808,7 +808,7 @@ public class IndexingConfigurationImpl
         	if (propertyName != null) {
 	        	for (QPropertyDefinition propertyDefinition : nodeTypeDefinition.getPropertyDefs()) {
 	        		if (propertyDefinition.getName().equals(propertyName)) {
-	        			return true;
+                        return condition == null || condition.evaluate(state);
 	        		}
 	        	}
         	}
