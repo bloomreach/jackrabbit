@@ -14,4 +14,4 @@
  * limitations under the License.
  */
 
-cmsPipeline(mvnGoals: 'clean deploy')
+cmsPipeline(mavenGoals: 'clean deploy')
