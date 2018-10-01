@@ -100,16 +100,47 @@ public class VirtualNodeTypeStateProvider extends AbstractVISProvider {
         return null;
     }
 
-    public void onNodeTypeAdded(Name ntName) {
-        discardAll(); // TODO: More efficient reloading
+    public void onNodeTypeAdded(Name ntName) throws RepositoryException {
+        reloadAll(); // TODO: More efficient reloading
     }
 
-    public void onNodeTypeModified(Name ntName) {
-        discardAll(); // TODO: More efficient reloading
+    public void onNodeTypeModified(Name ntName) throws RepositoryException {
+        reloadAll(); // TODO: More efficient reloading
     }
 
-    public void onNodeTypesRemoved(Collection<Name> names) {
+    public void onNodeTypesRemoved(Collection<Name> names) throws RepositoryException {
+        reloadAll(); // TODO: More efficient reloading
+    }
+
+    /**
+     * force reload all nodetype states by first discarding them all (original behavior) and then immediately force a
+     * rebuild by accessing the root state.
+     * <p>
+     *     The immediate rebuild after discard is needed to prevent a potential <em>resulting</em> exception
+     *     when thereafter a node state is unregistered via {@link #onNodeTypesRemoved(Collection)}, called from.
+     *     ({@link VirtualNodeTypeStateManager#nodeTypesUnregistered(Collection)}.
+     * </p>
+     * <p>
+     *     When the latter method is invoked while the states are still discarded (root == null), it will <em>then</em>
+     *     trigger the rebuild, see {@link #createRootNodeState()}. But the rebuild uses the current registered nodetypes
+     *     of the NodeTypeRegistry which no longer will have the nodetype(s) just removed, and that will eventually cause
+     *     an ItemNotFound exception in ({@link VirtualNodeTypeStateManager#nodeTypesUnregistered(Collection)} line #190,
+     *     trying to access the state of the nodetype removed for raising events.
+     * </p>
+     * <p>
+     *     As this problem can occur after any (previous) nodetype change (added/modified/removed), including from an
+     *     external (remote/cluster update) event, this only can/must be fixed right after every {@link #discardAll()}.
+     * </p>
+     * @throws RepositoryException
+     */
+    private void reloadAll() throws RepositoryException {
         discardAll(); // TODO: More efficient reloading
+        try {
+            // force rebuild
+            getRootState();
+        } catch (ItemStateException e) {
+            throw new RepositoryException(e);
+        }
     }
 
     /**
