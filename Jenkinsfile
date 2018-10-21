@@ -14,4 +14,4 @@
  * limitations under the License.
  */
 
-cmsPipeline(mavenGoals: 'clean deploy')
+cmsPipeline(deployBranches: ["hippo/jackrabbit-2.16.2-h1","hippo/jackrabbit-2.16.1-h1"])
