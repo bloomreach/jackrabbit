@@ -180,11 +180,11 @@ public class ConsistencyCheckerImpl {
         }
     }
 
-    private boolean hasErrors() {
+    boolean hasErrors() {
         return errors != null && !errors.isEmpty();
     }
 
-    private boolean hasRepairableErrors() {
+    boolean hasRepairableErrors() {
         if (hasErrors()) {
             for (ConsistencyCheckerError error : errors) {
                 if (error.isRepairable()) {
@@ -195,7 +195,7 @@ public class ConsistencyCheckerImpl {
         return false;
     }
 
-    private void checkLostNFound() {
+    void checkLostNFound() {
         if (lostNFoundId != null) {
             // do we have a "lost+found" node?
             try {
@@ -216,7 +216,7 @@ public class ConsistencyCheckerImpl {
         }
     }
 
-    private int internalCheckConsistency(String[] uuids, boolean recursive) throws RepositoryException {
+    int internalCheckConsistency(String[] uuids, boolean recursive) throws RepositoryException {
         int count = 0;
 
         if (uuids == null) {
@@ -312,7 +312,7 @@ public class ConsistencyCheckerImpl {
      * @param nodeInfo the node info for the node to check
      * @param infos all the {@link NodeInfo}s loaded in the current batch
      */
-    private void checkBundleConsistency(NodeId nodeId, NodeInfo nodeInfo, Map<NodeId, NodeInfo> infos) {
+    void checkBundleConsistency(NodeId nodeId, NodeInfo nodeInfo, Map<NodeId, NodeInfo> infos) {
 
         // skip all virtual nodes
         if (!isRoot(nodeId) && isVirtualNode(nodeId)) {
@@ -333,10 +333,10 @@ public class ConsistencyCheckerImpl {
             NodeInfo childNodeInfo = infos.get(childNodeId);
 
             if (childNodeInfo == null) {
-                addError(new MissingChild(nodeId, childNodeId));
+                addError(createMissingChild(nodeId, childNodeId));
             } else {
                 if (!nodeId.equals(childNodeInfo.getParentId())) {
-                    addError(new DisconnectedChild(nodeId, childNodeId, childNodeInfo.getParentId()));
+                    addError(createDisconnectedChild(nodeId, childNodeId, childNodeInfo.getParentId()));
                 }
             }
         }
@@ -348,7 +348,7 @@ public class ConsistencyCheckerImpl {
             NodeInfo parentInfo = infos.get(parentId);
 
             if (parentInfo == null) {
-                addError(new OrphanedNode(nodeId, parentId));
+                addError(createOrphanedNode(nodeId, parentId));
             } else {
                 // if the parent exists, does it have a child node entry for us?
                 boolean found = false;
@@ -361,7 +361,7 @@ public class ConsistencyCheckerImpl {
                 }
 
                 if (!found) {
-                    addError(new AbandonedNode(nodeId, parentId));
+                    addError(createAbandonedNode(nodeId, parentId));
                 }
 
             }
@@ -372,18 +372,18 @@ public class ConsistencyCheckerImpl {
         return nodeId.toString().endsWith("babecafebabe");
     }
 
-    private boolean isRoot(NodeId nodeId) {
+    boolean isRoot(NodeId nodeId) {
         return "cafebabe-cafe-babe-cafe-babecafebabe".equals(nodeId.toString());
     }
 
-    private void addError(ConsistencyCheckerError error) {
+    void addError(ConsistencyCheckerError error) {
         if (listener != null) {
             listener.report(error.getReportItem());
         }
         errors.add(error);
     }
 
-    private void info(String id, String message) {
+    void info(String id, String message) {
         if (this.listener == null) {
             String idstring = id == null ? "" : ("Node " + id + ": ");
             log.info(idstring + message);
@@ -392,7 +392,7 @@ public class ConsistencyCheckerImpl {
         }
     }
 
-    private void error(String id, String message) {
+    void error(String id, String message) {
         if (this.listener == null) {
             String idstring = id == null ? "" : ("Node " + id + ": ");
             log.error(idstring + message);
@@ -401,7 +401,7 @@ public class ConsistencyCheckerImpl {
         }
     }
 
-    private void error(String id, String message, Throwable ex) {
+    void error(String id, String message, Throwable ex) {
         String idstring = id == null ? "" : ("Node " + id + ": ");
         log.error(idstring + message, ex);
         if (listener != null) {
@@ -409,7 +409,7 @@ public class ConsistencyCheckerImpl {
         }
     }
 
-    private void storeBundle(NodePropBundle bundle) {
+    void storeBundle(NodePropBundle bundle) {
         try {
             bundle.markOld();
             bundle.setModCount((short) (bundle.getModCount()+1));
@@ -420,14 +420,14 @@ public class ConsistencyCheckerImpl {
         }
     }
 
-    private NodePropBundle getBundle(NodeId nodeId) throws ItemStateException {
+    NodePropBundle getBundle(NodeId nodeId) throws ItemStateException {
         if (bundles.containsKey(nodeId)) {
             return bundles.get(nodeId);
         }
         return pm.loadBundle(nodeId);
     }
 
-    private void saveBundle(NodePropBundle bundle) {
+    void saveBundle(NodePropBundle bundle) {
         bundles.put(bundle.getId(), bundle);
     }
 
@@ -437,11 +437,11 @@ public class ConsistencyCheckerImpl {
      *
      * This type of error is repaired by removing the corrupted child node entry.
      */
-    private class MissingChild extends ConsistencyCheckerError {
+    class MissingChild extends ConsistencyCheckerError {
 
         private final NodeId childNodeId;
 
-        private MissingChild(final NodeId nodeId, final NodeId childNodeId) {
+        MissingChild(final NodeId nodeId, final NodeId childNodeId) {
             super(nodeId, "NodeState '" + nodeId + "' references inexistent child '" + childNodeId + "'");
             this.childNodeId = childNodeId;
         }
@@ -493,7 +493,7 @@ public class ConsistencyCheckerImpl {
      *
      * This type of error is repaired by removing the corrupted child node entry.
      */
-    private class DisconnectedChild extends ConsistencyCheckerError {
+    class DisconnectedChild extends ConsistencyCheckerError {
 
         private final NodeId childNodeId;
 
@@ -551,7 +551,7 @@ public class ConsistencyCheckerImpl {
      * This type of error is repaired by reattaching the orphan to
      * a special purpose 'lost and found' node.
      */
-    private class OrphanedNode extends ConsistencyCheckerError {
+    class OrphanedNode extends ConsistencyCheckerError {
 
         private final NodeId parentNodeId;
 
@@ -612,7 +612,7 @@ public class ConsistencyCheckerImpl {
      * This type of error is repaired by adding the missing child node entry
      * to the parent.
      */
-    private class AbandonedNode extends ConsistencyCheckerError {
+    class AbandonedNode extends ConsistencyCheckerError {
 
         private final NodeId nodeId;
         private final NodeId parentNodeId;
@@ -643,7 +643,7 @@ public class ConsistencyCheckerImpl {
             changes.modified(new NodeState(parentNodeId, null, null, ItemState.STATUS_EXISTING, false));
         }
 
-        private Name createNodeName() {
+        Name createNodeName() {
             int n = (int) System.currentTimeMillis() + new Random().nextInt();
             final String localName = Integer.toHexString(n);
             final NameFactory nameFactory = NameFactoryImpl.getInstance();
@@ -670,7 +670,7 @@ public class ConsistencyCheckerImpl {
         }
     }
 
-    private class CheckerUpdate implements Update {
+    class CheckerUpdate implements Update {
 
         private final Map<String, Object> attributes = new HashMap<String, Object>();
         private final ChangeLog changeLog = new ChangeLog();
@@ -705,5 +705,29 @@ public class ConsistencyCheckerImpl {
         public String getUserData() {
             return null;
         }
+    }
+
+    MissingChild createMissingChild(final NodeId nodeId, final NodeId childNodeId) {
+        return new MissingChild(nodeId, childNodeId);
+    }
+
+    DisconnectedChild createDisconnectedChild(final NodeId nodeId, final NodeId childNodeId, final NodeId invalidParentId) {
+        return new DisconnectedChild(nodeId, childNodeId, invalidParentId);
+    }
+
+    OrphanedNode createOrphanedNode(final NodeId nodeId, final NodeId parentNodeId) {
+        return new OrphanedNode(nodeId, parentNodeId);
+    }
+
+    AbandonedNode createAbandonedNode(final NodeId nodeId, final NodeId parentNodeId) {
+        return new AbandonedNode(nodeId, parentNodeId);
+    }
+
+    List<ConsistencyCheckerError> getErrors() {
+        return errors;
+    }
+
+    Map<NodeId, NodePropBundle> getBundles() {
+        return bundles;
     }
 }
