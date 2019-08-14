@@ -2116,6 +2116,11 @@ public class RepositoryImpl extends AbstractRepository
             // get system Workspace instance
             WorkspaceImpl wsp = (WorkspaceImpl) getSystemSession().getWorkspace();
 
+            final SystemSession itmSystemSession = SystemSession.create(context, config);
+            itemStateMgr.setSystemSession(itmSystemSession);
+            itemStateMgr.setNamePathResolver(itmSystemSession.namePathResolver);
+            itemStateMgr.doPostInitialize();
+
             /**
              * todo implement 'System' workspace
              * FIXME
