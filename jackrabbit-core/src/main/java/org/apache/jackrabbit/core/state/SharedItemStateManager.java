@@ -25,6 +25,7 @@ import java.util.Set;
 import javax.jcr.PropertyType;
 import javax.jcr.ReferentialIntegrityException;
 import javax.jcr.RepositoryException;
+import javax.jcr.Session;
 import javax.jcr.nodetype.NoSuchNodeTypeException;
 
 import org.apache.jackrabbit.core.RepositoryImpl;
@@ -46,6 +47,7 @@ import org.apache.jackrabbit.core.value.InternalValue;
 import org.apache.jackrabbit.core.virtual.VirtualItemStateProvider;
 import org.apache.jackrabbit.spi.Name;
 import org.apache.jackrabbit.spi.QNodeDefinition;
+import org.apache.jackrabbit.spi.commons.conversion.NamePathResolver;
 import org.apache.jackrabbit.spi.commons.name.NameConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -189,6 +191,8 @@ public class SharedItemStateManager
     private UpdateEventChannel eventChannel = new DummyUpdateEventChannel();
 
     private final NodeIdFactory nodeIdFactory;
+    private NamePathResolver namePathResolver;
+    private Session systemSession;
 
     /**
      * Creates a new <code>SharedItemStateManager</code> instance.
@@ -471,6 +475,11 @@ public class SharedItemStateManager
 
         // clear cache
         cache.evictAll();
+
+        if (systemSession != null) {
+            systemSession.logout();
+            systemSession = null;
+        }
     }
 
     /**
@@ -491,6 +500,28 @@ public class SharedItemStateManager
         virtualProviders = provs;
 
         prov.addListener(this);
+    }
+
+
+
+    public void setNamePathResolver(final NamePathResolver namePathResolver) {
+        this.namePathResolver = namePathResolver;
+    }
+
+    public NamePathResolver getNamePathResolver() {
+        return namePathResolver;
+    }
+
+    public void setSystemSession(final Session systemSession) {
+        this.systemSession = systemSession;
+    }
+
+    public Session getSystemSession() {
+        return systemSession;
+    }
+
+    public void doPostInitialize() throws RepositoryException{
+        // do nothing
     }
 
     /**
