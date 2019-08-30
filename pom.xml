@@ -48,10 +48,13 @@
     <module>jackrabbit-jcr-server</module>
     <module>jackrabbit-jcr-rmi</module>
     <module>jackrabbit-jcr-servlet</module>
+<!--
     <module>jackrabbit-webapp</module>
+-->
     <module>jackrabbit-jca</module>
     <module>jackrabbit-spi</module>
     <module>jackrabbit-spi-commons</module>
+<!--
     <module>jackrabbit-jcr2spi</module>
     <module>jackrabbit-spi2jcr</module>
     <module>jackrabbit-spi2dav</module>
@@ -59,6 +62,7 @@
     <module>jackrabbit-jcr-client</module>
     <module>jackrabbit-bundle</module>
     <module>jackrabbit-standalone</module>
+-->
   </modules>
 
   <scm>
