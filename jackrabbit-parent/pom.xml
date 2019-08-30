@@ -345,6 +345,7 @@
               </Bundle-DocURL>
             </instructions>
           </configuration>
+<!--
           <executions>
             <execution>
               <phase>verify</phase>
@@ -353,6 +354,7 @@
               </goals>
             </execution>
           </executions>
+-->
         </plugin>
         <plugin>
           <groupId>org.codehaus.mojo</groupId>
