@@ -16,8 +16,13 @@
  */
 package org.apache.jackrabbit.core.query.lucene.directory;
 
+import java.io.File;
+import java.io.FileFilter;
+import java.io.IOException;
+
 import org.apache.jackrabbit.core.query.lucene.IOCounters;
 import org.apache.jackrabbit.core.query.lucene.SearchIndex;
+import org.apache.lucene.store.AlreadyClosedException;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.store.IndexInput;
@@ -26,16 +31,16 @@ import org.apache.lucene.store.Lock;
 import org.apache.lucene.store.LockFactory;
 import org.apache.lucene.store.NativeFSLockFactory;
 import org.apache.lucene.store.SimpleFSDirectory;
-
-import java.io.File;
-import java.io.FileFilter;
-import java.io.IOException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * <code>FSDirectoryManager</code> implements a directory manager for
  * {@link FSDirectory} instances.
  */
 public class FSDirectoryManager implements DirectoryManager {
+
+    private final static Logger log = LoggerFactory.getLogger(FSDirectoryManager.class);
 
     /**
      * The base directory.
@@ -141,6 +146,8 @@ public class FSDirectoryManager implements DirectoryManager {
 
     private static final class FSDir extends Directory {
 
+        private Exception closeStackTrace;
+
         private static final FileFilter FILTER = new FileFilter() {
             public boolean accept(File pathname) {
                 return pathname.isFile();
@@ -165,6 +172,8 @@ public class FSDirectoryManager implements DirectoryManager {
 
         @Override
         public String[] listAll() throws IOException {
+            stackTraceLoggingEnsureOpen();
+
             File[] files = directory.getDirectory().listFiles(FILTER);
             if (files == null) {
                 return null;
@@ -178,48 +187,61 @@ public class FSDirectoryManager implements DirectoryManager {
 
         @Override
         public boolean fileExists(String name) throws IOException {
+            stackTraceLoggingEnsureOpen();
             return directory.fileExists(name);
         }
 
         @Override
         public long fileModified(String name) throws IOException {
+            stackTraceLoggingEnsureOpen();
             return directory.fileModified(name);
         }
 
         @Override
         public void touchFile(String name) throws IOException {
+            stackTraceLoggingEnsureOpen();
             directory.touchFile(name);
         }
 
         @Override
         public void deleteFile(String name) throws IOException {
+            stackTraceLoggingEnsureOpen();
             directory.deleteFile(name);
         }
 
         @Override
         public long fileLength(String name) throws IOException {
+            stackTraceLoggingEnsureOpen();
             return directory.fileLength(name);
         }
 
         @Override
         public IndexOutput createOutput(String name) throws IOException {
+            stackTraceLoggingEnsureOpen();
             return directory.createOutput(name);
         }
 
         @Override
         public IndexInput openInput(String name) throws IOException {
+            stackTraceLoggingEnsureOpen();
             IndexInput in = directory.openInput(name);
             return new IndexInputLogWrapper(name, in);
         }
 
+
         @Override
         public void close() throws IOException {
+            closeStackTrace = new Exception("Stack Trace");
+            if (log.isDebugEnabled()) {
+                log.debug("FSDir closed, see the attached exception for a trace of where this FSDir was closed", closeStackTrace);
+            }
             directory.close();
         }
 
         @Override
         public IndexInput openInput(String name, int bufferSize)
                 throws IOException {
+            stackTraceLoggingEnsureOpen();
             IndexInput in = directory.openInput(name, bufferSize);
             return new IndexInputLogWrapper(name, in);
         }
@@ -251,6 +273,20 @@ public class FSDirectoryManager implements DirectoryManager {
 
         public String toString() {
             return getClass().getName() + '@' + directory;
+        }
+
+        private void stackTraceLoggingEnsureOpen() {
+            try {
+                ensureOpen();
+            } catch (AlreadyClosedException e) {
+                Exception trace = new Exception("Stack trace of attempting invoking method on already closed Directory");
+
+                log.error("Attempt to access FSDir after it has already been closed. See attached exception for a " +
+                        "trace of the call hierarchy to this method", trace);
+                log.error("FSDir has already been closed. See the attached exception for a trace of where this"
+                        + " FSDir was closed.", closeStackTrace);
+                throw e;
+            }
         }
     }
 
