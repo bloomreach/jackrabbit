@@ -279,10 +279,8 @@ public class FSDirectoryManager implements DirectoryManager {
             try {
                 ensureOpen();
             } catch (AlreadyClosedException e) {
-                Exception trace = new Exception("Stack trace of attempting invoking method on already closed Directory");
-
                 log.error("Attempt to access FSDir after it has already been closed. See attached exception for a " +
-                        "trace of the call hierarchy to this method", trace);
+                        "trace of the call hierarchy to this method", e);
                 log.error("FSDir has already been closed. See the attached exception for a trace of where this"
                         + " FSDir was closed.", closeStackTrace);
                 throw e;
