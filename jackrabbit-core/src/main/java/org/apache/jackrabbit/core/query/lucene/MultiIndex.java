@@ -1404,6 +1404,14 @@ public class MultiIndex {
 
     public synchronized <T> T doLockedOnMultiIndex(Callable<T> callable) throws Exception {
         synchronized (updateMonitor) {
+            while (updateInProgress) {
+                try {
+                    updateMonitor.wait();
+                } catch (InterruptedException e) {
+                    throw new IOException("Interrupted while waiting to aquire updateMonitor lock");
+                }
+            }
+
             return callable.call();
         }
     }
