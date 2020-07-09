@@ -21,6 +21,7 @@ import java.util.Set;
 
 import javax.jcr.RepositoryException;
 
+import org.apache.jackrabbit.core.id.NodeId;
 import org.apache.jackrabbit.core.state.NodeState;
 import org.apache.jackrabbit.core.state.PropertyState;
 import org.apache.jackrabbit.core.value.InternalValue;
@@ -76,6 +77,13 @@ public class NodeTypeInstanceHandler {
         if (values != null) {
             property.setValues(values);
         }
+    }
+
+    public static boolean isHippoIdentifierProperty(final Name propertyName, final Name declaringNodeTypeName) {
+        return "identifier".equals(propertyName.getLocalName()) &&
+                propertyName.getNamespaceURI().startsWith("http://www.onehippo.org/jcr/hippo/nt/") &&
+                propertyName.getNamespaceURI().equals(declaringNodeTypeName.getNamespaceURI()) &&
+                "identifiable".equals(declaringNodeTypeName.getLocalName());
     }
 
     /**
@@ -136,6 +144,8 @@ public class NodeTypeInstanceHandler {
                 // TODO: provide real implementation
                 genValues = new InternalValue[]{InternalValue.create("")};
             }
+        } else if (isHippoIdentifierProperty(name, declaringNT)) {
+            genValues = new InternalValue[]{InternalValue.create(NodeId.randomId().toString())};
         }
         return genValues;
     }
