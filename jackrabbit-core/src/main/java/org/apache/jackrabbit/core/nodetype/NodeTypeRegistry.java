@@ -44,6 +44,7 @@ import javax.jcr.version.OnParentVersionAction;
 import org.apache.commons.collections4.map.AbstractReferenceMap.ReferenceStrength;
 import org.apache.commons.collections4.map.ReferenceMap;
 import org.apache.commons.io.IOUtils;
+import org.apache.jackrabbit.core.NodeTypeInstanceHandler;
 import org.apache.jackrabbit.core.cluster.NodeTypeEventChannel;
 import org.apache.jackrabbit.core.cluster.NodeTypeEventListener;
 import org.apache.jackrabbit.core.fs.FileSystem;
@@ -1574,7 +1575,8 @@ public class NodeTypeRegistry implements NodeTypeEventListener {
                 }
             } else {
                 // no default values specified
-                if (!lenient) {
+                if (!lenient &&
+                        !(ntd.isMixin() && NodeTypeInstanceHandler.isHippoIdentifierProperty(pd.getName(), name))) {
                     // auto-created properties must have a default value
                     if (pd.isAutoCreated()) {
                         String msg = "[" + name + "#" + pd.getName()
