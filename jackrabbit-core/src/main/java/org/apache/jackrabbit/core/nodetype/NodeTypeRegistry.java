@@ -425,7 +425,7 @@ public class NodeTypeRegistry implements NodeTypeEventListener {
              * build diff of current and new definition and determine type of change
              */
             QNodeTypeDefinition ntdOld = registeredNTDefs.get(name);
-            NodeTypeDefDiff diff = NodeTypeDefDiff.create(ntdOld, ntd);
+            NodeTypeDefDiff diff = createNodeTypeDefDiff(ntdOld, ntd);
             if (!diff.isModified()) {
                 // the definition has not been modified, there's nothing to do here...
                 return getEffectiveNodeType(name);
@@ -462,6 +462,10 @@ public class NodeTypeRegistry implements NodeTypeEventListener {
 
         return entNew;
 
+    }
+
+    protected NodeTypeDefDiff createNodeTypeDefDiff(final QNodeTypeDefinition oldDef, QNodeTypeDefinition newDef) {
+        return NodeTypeDefDiff.create(oldDef, newDef);
     }
 
     /**

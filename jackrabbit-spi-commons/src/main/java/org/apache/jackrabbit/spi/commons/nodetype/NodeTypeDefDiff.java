@@ -103,7 +103,7 @@ public class NodeTypeDefDiff {
      * @param oldDef old definition
      * @param newDef new definition
      */
-    private NodeTypeDefDiff(QNodeTypeDefinition oldDef, QNodeTypeDefinition newDef) {
+    protected NodeTypeDefDiff(QNodeTypeDefinition oldDef, QNodeTypeDefinition newDef) {
         this.oldDef = oldDef;
         this.newDef = newDef;
         if (oldDef.equals(newDef)) {
@@ -167,6 +167,22 @@ public class NodeTypeDefDiff {
             throw new IllegalArgumentException("at least node type names must be matching");
         }
         return new NodeTypeDefDiff(oldDef, newDef);
+    }
+
+    protected QNodeTypeDefinition getOldDef() {
+        return oldDef;
+    }
+
+    protected QNodeTypeDefinition getNewDef() {
+        return newDef;
+    }
+
+    protected List<PropDefDiff> getPropDefDiffs() {
+        return propDefDiffs;
+    }
+
+    protected List<ChildNodeDefDiff> getChildNodeDefDiffs() {
+        return childNodeDefDiffs;
     }
 
     /**
@@ -249,7 +265,7 @@ public class NodeTypeDefDiff {
         return result;
     }
 
-    private String toString(List<? extends ChildItemDefDiff> childItemDefDiffs) {
+    protected String toString(List<? extends ChildItemDefDiff> childItemDefDiffs) {
         String result = "";
         for (Iterator iter = childItemDefDiffs.iterator(); iter.hasNext();) {
             ChildItemDefDiff propDefDiff = (ChildItemDefDiff) iter.next();
@@ -262,7 +278,7 @@ public class NodeTypeDefDiff {
         return result;
     }
 
-    private String modificationTypeToString(int modificationType) {
+    protected String modificationTypeToString(int modificationType) {
         String typeString = "unknown";
         switch (modificationType) {
             case NONE:
@@ -281,15 +297,15 @@ public class NodeTypeDefDiff {
 
     //--------------------------------------------------------< inner classes >
 
-    private abstract class ChildItemDefDiffBuilder<T extends QItemDefinition, V extends ChildItemDefDiff<T>> {
+    protected abstract class ChildItemDefDiffBuilder<T extends QItemDefinition, V extends ChildItemDefDiff<T>> {
 
         private final List<V> childItemDefDiffs = new ArrayList<V>();
 
-        private ChildItemDefDiffBuilder(T[] oldDefs, T[] newDefs) {
+        public ChildItemDefDiffBuilder(T[] oldDefs, T[] newDefs) {
             buildChildItemDefDiffs(collectChildNodeDefs(oldDefs), collectChildNodeDefs(newDefs));
         }
 
-        private void buildChildItemDefDiffs(Map<Object, List<T>> oldDefs, Map<Object, List<T>> newDefs) {
+        public void buildChildItemDefDiffs(Map<Object, List<T>> oldDefs, Map<Object, List<T>> newDefs) {
             for (Object defId : oldDefs.keySet()) {
                 this.childItemDefDiffs.addAll(getChildItemDefDiffs(oldDefs.get(defId), newDefs.get(defId)));
                 newDefs.remove(defId);
@@ -299,7 +315,7 @@ public class NodeTypeDefDiff {
             }
         }
 
-        private Map<Object, List<T>> collectChildNodeDefs(final T[] defs) {
+        public Map<Object, List<T>> collectChildNodeDefs(final T[] defs) {
             Map<Object, List<T>> result = new HashMap<Object, List<T>>();
             for (T def : defs) {
                 final Object defId = createQItemDefinitionId(def);
@@ -313,11 +329,11 @@ public class NodeTypeDefDiff {
             return result;
         }
 
-        abstract Object createQItemDefinitionId(T def);
+        public abstract Object createQItemDefinitionId(T def);
 
-        abstract V createChildItemDefDiff(T def1, T def2);
+        public abstract V createChildItemDefDiff(T def1, T def2);
 
-        Collection<V> getChildItemDefDiffs(List<T> defs1, List<T> defs2) {
+        public Collection<V> getChildItemDefDiffs(List<T> defs1, List<T> defs2) {
             defs1 = defs1 != null ? defs1 : Collections.<T>emptyList();
             defs2 = defs2 != null ? defs2 : Collections.<T>emptyList();
             // collect all possible combinations of diffs
@@ -366,7 +382,7 @@ public class NodeTypeDefDiff {
             return results;
         }
 
-        private boolean alreadyMatched(final List<V> result, final T newDef, final T oldDef, final int allowedNewNull, final int allowedOldNull) {
+        public boolean alreadyMatched(final List<V> result, final T newDef, final T oldDef, final int allowedNewNull, final int allowedOldNull) {
             boolean containsNewDef = false, containsOldDef = false;
             for (V d : result) {
                 if (d.getNewDef() != null && d.getNewDef().equals(newDef)) {
@@ -392,11 +408,11 @@ public class NodeTypeDefDiff {
             return containsNewDef || containsOldDef;
         }
 
-        List<V> getChildItemDefDiffs() {
+        public List<V> getChildItemDefDiffs() {
             return childItemDefDiffs;
         }
 
-        int getMaxType() {
+        public int getMaxType() {
             int maxType = NONE;
             for (V childItemDefDiff : childItemDefDiffs) {
                 if (childItemDefDiff.getType() > maxType) {
@@ -407,12 +423,12 @@ public class NodeTypeDefDiff {
         }
     }
 
-    private abstract class ChildItemDefDiff<T extends QItemDefinition> {
+    protected abstract class ChildItemDefDiff<T extends QItemDefinition> {
         protected final T oldDef;
         protected final T newDef;
         protected int type;
 
-        private ChildItemDefDiff(T oldDef, T newDef) {
+        public ChildItemDefDiff(T oldDef, T newDef) {
             this.oldDef = oldDef;
             this.newDef = newDef;
             init();
@@ -464,27 +480,27 @@ public class NodeTypeDefDiff {
             }
         }
 
-        T getOldDef() {
+        public T getOldDef() {
             return oldDef;
         }
 
-        T getNewDef() {
+        public T getNewDef() {
             return newDef;
         }
 
-        int getType() {
+        public int getType() {
             return type;
         }
 
-        boolean isAdded() {
+        public boolean isAdded() {
             return oldDef == null && newDef != null;
         }
 
-        boolean isRemoved() {
+        public boolean isRemoved() {
             return oldDef != null && newDef == null;
         }
 
-        boolean isModified() {
+        public boolean isModified() {
             return oldDef != null && newDef != null
                     && !oldDef.equals(newDef);
         }
@@ -513,9 +529,9 @@ public class NodeTypeDefDiff {
 
     }
 
-    private class PropDefDiff extends ChildItemDefDiff<QPropertyDefinition> {
+    protected class PropDefDiff extends ChildItemDefDiff<QPropertyDefinition> {
 
-        private PropDefDiff(QPropertyDefinition oldDef, QPropertyDefinition newDef) {
+        public PropDefDiff(QPropertyDefinition oldDef, QPropertyDefinition newDef) {
             super(oldDef, newDef);
         }
 
@@ -598,9 +614,9 @@ public class NodeTypeDefDiff {
         }
     }
 
-    private class ChildNodeDefDiff extends ChildItemDefDiff<QNodeDefinition> {
+    protected class ChildNodeDefDiff extends ChildItemDefDiff<QNodeDefinition> {
 
-        private ChildNodeDefDiff(QNodeDefinition oldDef, QNodeDefinition newDef) {
+        public ChildNodeDefDiff(QNodeDefinition oldDef, QNodeDefinition newDef) {
             super(oldDef, newDef);
         }
 
@@ -650,14 +666,22 @@ public class NodeTypeDefDiff {
     /**
      * Identifier used to identify corresponding property definitions
      */
-    private static class QPropertyDefinitionId {
+    protected static class QPropertyDefinitionId {
 
         private Name declaringNodeType;
         private Name name;
 
-        private QPropertyDefinitionId(QPropertyDefinition def) {
+        public QPropertyDefinitionId(QPropertyDefinition def) {
             declaringNodeType = def.getDeclaringNodeType();
             name = def.getName();
+        }
+
+        public Name getDeclaringNodeType() {
+            return declaringNodeType;
+        }
+
+        public Name getName() {
+            return name;
         }
 
         //---------------------------------------< java.lang.Object overrides >
@@ -686,14 +710,22 @@ public class NodeTypeDefDiff {
     /**
      * Identifier used to identify corresponding node definitions
      */
-    private static class QNodeDefinitionId {
+    protected static class QNodeDefinitionId {
 
         private Name declaringNodeType;
         private Name name;
 
-        private QNodeDefinitionId(QNodeDefinition def) {
+        public QNodeDefinitionId(QNodeDefinition def) {
             declaringNodeType = def.getDeclaringNodeType();
             name = def.getName();
+        }
+
+        public Name getDeclaringNodeType() {
+            return declaringNodeType;
+        }
+
+        public Name getName() {
+            return name;
         }
 
         //---------------------------------------< java.lang.Object overrides >
@@ -719,36 +751,36 @@ public class NodeTypeDefDiff {
         }
     }
 
-    private class ChildNodeDefDiffBuilder extends ChildItemDefDiffBuilder<QNodeDefinition, ChildNodeDefDiff> {
+    protected class ChildNodeDefDiffBuilder extends ChildItemDefDiffBuilder<QNodeDefinition, ChildNodeDefDiff> {
 
-        private ChildNodeDefDiffBuilder(final QNodeDefinition[] defs1, final QNodeDefinition[] defs2) {
+        public ChildNodeDefDiffBuilder(final QNodeDefinition[] defs1, final QNodeDefinition[] defs2) {
             super(defs1, defs2);
         }
 
         @Override
-        Object createQItemDefinitionId(final QNodeDefinition def) {
+        public Object createQItemDefinitionId(final QNodeDefinition def) {
             return new QNodeDefinitionId(def);
         }
 
         @Override
-        ChildNodeDefDiff createChildItemDefDiff(final QNodeDefinition def1, final QNodeDefinition def2) {
+        public ChildNodeDefDiff createChildItemDefDiff(final QNodeDefinition def1, final QNodeDefinition def2) {
             return new ChildNodeDefDiff(def1, def2);
         }
     }
 
-    private class PropDefDiffBuilder extends ChildItemDefDiffBuilder<QPropertyDefinition, PropDefDiff> {
+    protected class PropDefDiffBuilder extends ChildItemDefDiffBuilder<QPropertyDefinition, PropDefDiff> {
 
-        private PropDefDiffBuilder(final QPropertyDefinition[] defs1, final QPropertyDefinition[] defs2) {
+        public PropDefDiffBuilder(final QPropertyDefinition[] defs1, final QPropertyDefinition[] defs2) {
             super(defs1, defs2);
         }
 
         @Override
-        Object createQItemDefinitionId(final QPropertyDefinition def) {
+        public Object createQItemDefinitionId(final QPropertyDefinition def) {
             return new QPropertyDefinitionId(def);
         }
 
         @Override
-        PropDefDiff createChildItemDefDiff(final QPropertyDefinition def1, final QPropertyDefinition def2) {
+        public PropDefDiff createChildItemDefDiff(final QPropertyDefinition def1, final QPropertyDefinition def2) {
             return new PropDefDiff(def1, def2);
         }
     }
