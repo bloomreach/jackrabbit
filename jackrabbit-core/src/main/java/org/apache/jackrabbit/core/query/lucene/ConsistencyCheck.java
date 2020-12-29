@@ -114,6 +114,13 @@ public class ConsistencyCheck {
      */
     private final Set<Path> ignoredPaths = new HashSet<Path>();
 
+    /**
+     * @deprecated since hippo:skipindex usage has been removed : once the oldest supported CMS stack supporting
+     * hippo:skipindex and using this latest Hippo JR repository is not supported any more, after that this
+     * 'skipIndexTypeName' and all usages can be completely dropped : this might already be the case right but needs
+     * careful checking
+     */
+    @Deprecated
     private Name skipIndexTypeName;
 
     /**
@@ -164,11 +171,13 @@ public class ConsistencyCheck {
             final IndexingConfiguration indexingConfig = handler.getIndexingConfig();
             skipIndexTypeName = (Name) indexingConfig.getClass().getMethod("getSkipIndexName").invoke(indexingConfig);
         } catch (IllegalAccessException e) {
-            log.error("Failed to determine skip index type name", e);
+            log.debug("Failed to determine skip index type name", e);
         } catch (InvocationTargetException e) {
             log.error("Failed to determine skip index type name", e);
         } catch (NoSuchMethodException e) {
-            log.error("Failed to determine skip index type name", e);
+            // in newer versions, the 'getSkipIndexName' method is not present any more since deprecated usage and
+            // hippo:skipindex has been even removed for SaaS
+            log.info("Failed to determine skip index type name", e);
         }
     }
 
@@ -436,6 +445,7 @@ public class ConsistencyCheck {
                     return true;
                 }
             }
+            // TODO skipIndexTypeName has been deprecated
             if (skipIndexTypeName != null) {
                 NodeState nodeState = (NodeState) handler.getContext().getItemStateManager().getItemState(id);
                 while (nodeState != null) {
