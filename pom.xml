@@ -37,6 +37,12 @@
 
   <modules>
     <module>jackrabbit-parent</module>
+    <!-- even though jackrabbit-api has been added to jackrabbit oak project, it doesn't inherit
+         jetbrains annotations dependency and also the name of jackrabbit-api has been changed to
+         oak-jackrabbit-api. To introduce less maintenance efforts, jackrabbit-api downstream
+         project is created again to manage those dependencies.
+    -->
+    <module>jackrabbit-api</module>
     <module>jackrabbit-jcr-commons</module>
     <module>jackrabbit-jcr-tests</module>
     <module>jackrabbit-data</module>
