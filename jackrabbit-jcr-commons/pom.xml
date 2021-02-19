@@ -69,13 +69,13 @@
     <!--
        optional dependency to jackrabbit api.
        this is used for general API utilities that cover not only the
-       JCR API but also it's extensions in oak-jackrabbit-api such as e.g.
+       JCR API but also it's extensions in jackrabbit-api such as e.g.
        user management or extended access control functionality.
     -->
     <dependency>
       <groupId>org.apache.jackrabbit</groupId>
-      <artifactId>oak-jackrabbit-api</artifactId>
-      <version>${oak-jackrabbit-api.version.used}</version>
+      <artifactId>jackrabbit-api</artifactId>
+      <version>${project.version}</version>
       <optional>true</optional>
     </dependency>
     <dependency>

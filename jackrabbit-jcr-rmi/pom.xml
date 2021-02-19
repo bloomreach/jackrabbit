@@ -538,11 +538,11 @@ org.apache.jackrabbit.test.api.observation.EventJournalTest
       <scope>provided</scope>
     </dependency>
     
-    <!-- Oak Jackrabbit API extensions -->
+    <!-- Jackrabbit API extensions -->
     <dependency>
       <groupId>org.apache.jackrabbit</groupId>
-      <artifactId>oak-jackrabbit-api</artifactId>
-      <version>${oak-jackrabbit-api.version.implemented}</version>
+      <artifactId>jackrabbit-api</artifactId>
+      <version>${project.version}</version>
       <scope>provided</scope>
     </dependency>
 
