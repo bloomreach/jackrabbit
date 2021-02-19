@@ -480,11 +480,6 @@
       </dependency>
       <dependency>
         <groupId>org.apache.jackrabbit</groupId>
-        <artifactId>oak-jackrabbit-api</artifactId>
-        <version>${oak.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.jackrabbit</groupId>
         <artifactId>jackrabbit-jcr-benchmark</artifactId>
         <version>1.5.0</version>
       </dependency>
