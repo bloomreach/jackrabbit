@@ -60,6 +60,9 @@
       <version>${oak.version}</version>
     </dependency>
     <!-- nullability, see JCR-4301 -->
+    <!-- This dependency is promoting the scope of jetbrains-annotations dependency that is
+         defined on oak-jackrabbit-api. It's important to keep the version number same with
+         the jetbrains-annotations defined in oak-jackrabbit-api-->
     <dependency>
       <groupId>org.jetbrains</groupId>
       <artifactId>annotations</artifactId>
