@@ -63,13 +63,13 @@ public class SessionItemStateManager
     /**
      * map of those states that have been removed transiently
      */
-    private final Map<ItemId, ItemState> atticStore =
+    public final Map<ItemId, ItemState> atticStore =
             Collections.synchronizedMap(new HashMap<ItemId, ItemState>());
 
     /**
      * map of new or modified transient states
      */
-    private final Map<ItemId, ItemState> transientStore =
+    public final Map<ItemId, ItemState> transientStore =
             Collections.synchronizedMap(new HashMap<ItemId, ItemState>());
 
     /**
