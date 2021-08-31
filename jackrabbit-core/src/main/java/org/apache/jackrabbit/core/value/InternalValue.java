@@ -79,6 +79,8 @@ public class InternalValue extends AbstractQValue {
 
     private static final InternalValue BOOLEAN_FALSE = new InternalValue(false);
 
+    private Long binaryLength;
+
     /**
      * Temporary binary values smaller or equal this size are kept in memory
      */
@@ -313,10 +315,10 @@ public class InternalValue extends AbstractQValue {
     public static InternalValue create(Calendar value) {
         return new InternalValue(value);
     }
-    
+
     /**
      * https://issues.apache.org/jira/browse/JCR-3083
-     * 
+     *
      * @param value
      * @return the created value
      */
@@ -538,7 +540,7 @@ public class InternalValue extends AbstractQValue {
     private InternalValue(String value, int type) {
         super(value, type);
     }
-    
+
     private InternalValue(Name value) {
         super(value);
     }
@@ -648,7 +650,10 @@ public class InternalValue extends AbstractQValue {
     @Override
     public long getLength() throws RepositoryException {
         if (PropertyType.BINARY == type) {
-            return ((Binary) val).getSize();
+            if (binaryLength == null) {
+                binaryLength = Long.valueOf(((Binary) val).getSize());
+            }
+            return binaryLength.longValue();
         } else {
             return super.getLength();
         }
