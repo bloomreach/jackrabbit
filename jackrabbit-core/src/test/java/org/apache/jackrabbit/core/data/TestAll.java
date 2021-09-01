@@ -50,7 +50,8 @@ public class TestAll extends TestCase {
         suite.addTestSuite(PersistenceManagerIteratorTest.class);
         suite.addTestSuite(TestTwoGetStreams.class);
         suite.addTestSuite(WriteWhileReadingTest.class);
-        suite.addTestSuite(GCSubtreeMoveTest.class);
+        // see GCSubtreeMoveTest why skipped
+        //suite.addTestSuite(GCSubtreeMoveTest.class);
 
         return suite;
     }
