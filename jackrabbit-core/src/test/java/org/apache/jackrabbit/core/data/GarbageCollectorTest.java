@@ -21,6 +21,7 @@ import org.apache.jackrabbit.api.management.MarkEventListener;
 import org.apache.jackrabbit.core.SessionImpl;
 import org.apache.jackrabbit.core.gc.GarbageCollector;
 import org.apache.jackrabbit.test.AbstractJCRTest;
+import org.junit.Ignore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import EDU.oswego.cs.dl.util.concurrent.SynchronousChannel;
@@ -132,6 +133,16 @@ public class GarbageCollectorTest extends AbstractJCRTest implements ScanEventLi
         gc.close();
     }
 
+    /**
+     * Because of the fix in CMS-14788, this test setup is not valid any more: it does some quirky test only invocation
+     * and measures which binaries are in use after the clean up. However, they first invoke getDataStore().clearInUse :
+     * this test relies on that the binary is added again to 'inUse' because the 'getLength' is invoked, however,
+     * since CMS-14788 this invocation does not lead to a new database call and does not populate the inUse. This
+     * test is really convoluted and relies on some quirky internals and cannot be done in this way any more
+     *
+     * Apart from that, afaik, we do not use this datastore GC at all
+     */
+    @Ignore
     public void testGC() throws Exception {
         Node root = testRootNode;
         Session session = root.getSession();
