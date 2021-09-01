@@ -11,6 +11,8 @@ git worktree add -b hippo/jackrabbit-2.20.X-hX ../jackrabbit-2.20.X-hX jackrabbi
    1. There are about 25 changes total -- just do the grunt work.
 
 # Release new Hippo Jackrabbit
+Note below steps are from Pulsar slack channel, they did not work for me
+
 1. mvn versions:set -DnewVersion=2.20.X-hX -DgenerateBackupPoms=false
 1. mvn clean deploy
 1. git tag jackrabbit-2.20.X-h1
