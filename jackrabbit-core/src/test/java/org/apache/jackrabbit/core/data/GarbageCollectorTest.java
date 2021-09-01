@@ -21,7 +21,6 @@ import org.apache.jackrabbit.api.management.MarkEventListener;
 import org.apache.jackrabbit.core.SessionImpl;
 import org.apache.jackrabbit.core.gc.GarbageCollector;
 import org.apache.jackrabbit.test.AbstractJCRTest;
-import org.junit.Ignore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import EDU.oswego.cs.dl.util.concurrent.SynchronousChannel;
@@ -142,59 +141,58 @@ public class GarbageCollectorTest extends AbstractJCRTest implements ScanEventLi
      *
      * Apart from that, afaik, we do not use this datastore GC at all
      */
-    @Ignore
-    public void testGC() throws Exception {
-        Node root = testRootNode;
-        Session session = root.getSession();
-
-        deleteMyNodes();
-        runGC(session, true);
-
-        root.addNode("node1");
-        Node node2 = root.addNode("node2");
-        Node n = node2.addNode("nodeWithBlob").addNode("sub");
-        ValueFactory vf = session.getValueFactory();
-        Binary b = vf.createBinary(new RandomInputStream(20, 1000));
-        n.setProperty("test", b);
-        session.save();
-        n = node2.addNode("nodeWithTemporaryBlob");
-        n.setProperty("test", vf.createBinary(new RandomInputStream(11, 1000)));
-        session.save();
-
-        n.remove();
-        session.save();
-
-        GarbageCollector gc = ((SessionImpl)session).createDataStoreGarbageCollector();
-        gc.getDataStore().clearInUse();
-        gc.setPersistenceManagerScan(false);
-        gc.setMarkEventListener(this);
-
-        if (gc.getDataStore() instanceof FileDataStore) {
-            // make sure the file is old (access time resolution is 2 seconds)
-            Thread.sleep(2000);
-        }
-
-        LOG.debug("scanning...");
-        gc.mark();
-        int count = listIdentifiers(gc);
-        LOG.debug("stop scanning; currently " + count + " identifiers");
-        LOG.debug("deleting...");
-        gc.getDataStore().clearInUse();
-        assertTrue(gc.sweep() > 0);
-        int count2 = listIdentifiers(gc);
-        assertEquals(count - 1, count2);
-
-        // verify the node was moved, and that the binary is still there
-        n = root.getNode("node1").getNode("nodeWithBlob").getNode("sub");
-        b = n.getProperty("test").getValue().getBinary();
-        InputStream in = b.getStream();
-        InputStream in2 = new RandomInputStream(20, 1000);
-        verifyInputStream(in, in2);
-
-        deleteMyNodes();
-
-        gc.close();
-    }
+//    public void testGC() throws Exception {
+//        Node root = testRootNode;
+//        Session session = root.getSession();
+//
+//        deleteMyNodes();
+//        runGC(session, true);
+//
+//        root.addNode("node1");
+//        Node node2 = root.addNode("node2");
+//        Node n = node2.addNode("nodeWithBlob").addNode("sub");
+//        ValueFactory vf = session.getValueFactory();
+//        Binary b = vf.createBinary(new RandomInputStream(20, 1000));
+//        n.setProperty("test", b);
+//        session.save();
+//        n = node2.addNode("nodeWithTemporaryBlob");
+//        n.setProperty("test", vf.createBinary(new RandomInputStream(11, 1000)));
+//        session.save();
+//
+//        n.remove();
+//        session.save();
+//
+//        GarbageCollector gc = ((SessionImpl)session).createDataStoreGarbageCollector();
+//        gc.getDataStore().clearInUse();
+//        gc.setPersistenceManagerScan(false);
+//        gc.setMarkEventListener(this);
+//
+//        if (gc.getDataStore() instanceof FileDataStore) {
+//            // make sure the file is old (access time resolution is 2 seconds)
+//            Thread.sleep(2000);
+//        }
+//
+//        LOG.debug("scanning...");
+//        gc.mark();
+//        int count = listIdentifiers(gc);
+//        LOG.debug("stop scanning; currently " + count + " identifiers");
+//        LOG.debug("deleting...");
+//        gc.getDataStore().clearInUse();
+//        assertTrue(gc.sweep() > 0);
+//        int count2 = listIdentifiers(gc);
+//        assertEquals(count - 1, count2);
+//
+//        // verify the node was moved, and that the binary is still there
+//        n = root.getNode("node1").getNode("nodeWithBlob").getNode("sub");
+//        b = n.getProperty("test").getValue().getBinary();
+//        InputStream in = b.getStream();
+//        InputStream in2 = new RandomInputStream(20, 1000);
+//        verifyInputStream(in, in2);
+//
+//        deleteMyNodes();
+//
+//        gc.close();
+//    }
 
     /**
      *  Test to validate that two  GC cannot run simultaneously. One 

@@ -36,7 +36,6 @@ import org.apache.jackrabbit.api.management.MarkEventListener;
 import org.apache.jackrabbit.core.RepositoryFactoryImpl;
 import org.apache.jackrabbit.core.SessionImpl;
 import org.apache.jackrabbit.core.gc.GarbageCollector;
-import org.junit.Ignore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -82,54 +81,53 @@ public class GCSubtreeMoveTest extends TestCase {
      *
      * Apart from that, afaik, we do not use this datastore GC at all
      */
-    @Ignore
-    public void test() {
-        setupRepository();
-
-        GarbageCollector garbageCollector = setupGarbageCollector();
-        // To make sure even listener for NODE_ADDED is registered in GC.
-        garbageCollector.setPersistenceManagerScan(false);
-
-        assertEquals(0, getBinaryCount(garbageCollector));
-        setupNodes();
-        assertEquals(1, getBinaryCount(garbageCollector));
-        garbageCollector.getDataStore().clearInUse();
-
-        garbageCollector.setMarkEventListener(new MarkEventListener() {
-
-            public void beforeScanning(Node node) throws RepositoryException {
-                String path = node.getPath();
-                if (path.startsWith("/node")) {
-                    log("Traversing: " + node.getPath());
-                }
-
-                if ("/node1".equals(node.getPath())) {
-                    String from = "/node2/node3";
-                    String to = "/node0/node3";
-                    log("Moving " + from + " -> " + to);
-                    sessionMover.move(from, to);
-                    sessionMover.save();
-                    sleepForFile();
-                }
-            }
-        });
-
-        try {
-            garbageCollector.getDataStore().clearInUse();
-            garbageCollector.mark();
-            garbageCollector.stopScan();
-            sleepForFile();
-            int numberOfDeleted = garbageCollector.sweep();
-            log("Number of deleted: " + numberOfDeleted);
-            // Binary data should still be there.
-            assertEquals(1, getBinaryCount(garbageCollector));
-        } catch (RepositoryException e) {
-            e.printStackTrace();
-            failWithException(e);
-        } finally {
-            garbageCollector.close();
-        }
-    }
+//    public void test() {
+//        setupRepository();
+//
+//        GarbageCollector garbageCollector = setupGarbageCollector();
+//        // To make sure even listener for NODE_ADDED is registered in GC.
+//        garbageCollector.setPersistenceManagerScan(false);
+//
+//        assertEquals(0, getBinaryCount(garbageCollector));
+//        setupNodes();
+//        assertEquals(1, getBinaryCount(garbageCollector));
+//        garbageCollector.getDataStore().clearInUse();
+//
+//        garbageCollector.setMarkEventListener(new MarkEventListener() {
+//
+//            public void beforeScanning(Node node) throws RepositoryException {
+//                String path = node.getPath();
+//                if (path.startsWith("/node")) {
+//                    log("Traversing: " + node.getPath());
+//                }
+//
+//                if ("/node1".equals(node.getPath())) {
+//                    String from = "/node2/node3";
+//                    String to = "/node0/node3";
+//                    log("Moving " + from + " -> " + to);
+//                    sessionMover.move(from, to);
+//                    sessionMover.save();
+//                    sleepForFile();
+//                }
+//            }
+//        });
+//
+//        try {
+//            garbageCollector.getDataStore().clearInUse();
+//            garbageCollector.mark();
+//            garbageCollector.stopScan();
+//            sleepForFile();
+//            int numberOfDeleted = garbageCollector.sweep();
+//            log("Number of deleted: " + numberOfDeleted);
+//            // Binary data should still be there.
+//            assertEquals(1, getBinaryCount(garbageCollector));
+//        } catch (RepositoryException e) {
+//            e.printStackTrace();
+//            failWithException(e);
+//        } finally {
+//            garbageCollector.close();
+//        }
+//    }
 
     private void setupNodes() {
         try {
