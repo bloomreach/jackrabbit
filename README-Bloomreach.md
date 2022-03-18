@@ -11,9 +11,13 @@ git worktree add -b hippo/jackrabbit-2.20.X-hX ../jackrabbit-2.20.X-hX jackrabbi
    1. There are about 25 changes total -- just do the grunt work.
 
 # Release new Hippo Jackrabbit
-Note below steps are from Pulsar slack channel, they did not work for me
-
-1. mvn versions:set -DnewVersion=2.20.X-hX -DgenerateBackupPoms=false
-1. mvn clean deploy
-1. git tag jackrabbit-2.20.X-h1
-1. git push origin jackrabbit-2.20.X-hX
+1. First, make sure that the initial version is a SNAPSHOT version
+1. Apply your changes
+1. Update the version to a release version: e.g. `for pom in $(find . -name pom.xml ); do sed -i 's/2.21.6-h3-SNAPSHOT/2.21.6-h3/g' $pom; done`
+1. git commit
+1. git tag -a
+1. Deploy to the enterprise nexus: `mvn deploy`
+1. Deploy to the community nexus: `mvn deploy -DaltDeploymentRepository=hippo-maven2::default::https://maven.onehippo.com/content/repositories/releases/`
+1. Set the next Snapshot version: e.g. `for pom in $(find . -name pom.xml ); do sed -i 's/2.21.6-h3/2.21.6-h4-SNAPSHOT/g' $pom; done`
+1. git commit
+1. git push --follow-tags
