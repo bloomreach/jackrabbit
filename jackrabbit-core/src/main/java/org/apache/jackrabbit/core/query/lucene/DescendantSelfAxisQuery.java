@@ -393,6 +393,8 @@ class DescendantSelfAxisQuery extends Query implements JackrabbitQuery {
         public Scorer scorer(IndexReader reader, boolean scoreDocsInOrder,
                 boolean topScorer) throws IOException {
             contextScorer = searcher.createNormalizedWeight(contextQuery).scorer(reader, scoreDocsInOrder, false);
+            // note subScorer can be null as lucene optimizes scorer to be null in case for eg a free text search the used term
+            // does not exist
             subScorer = searcher.createNormalizedWeight(subQuery).scorer(reader, scoreDocsInOrder, false);
             HierarchyResolver resolver = (HierarchyResolver) reader;
             return new DescendantSelfAxisScorer(searcher.getSimilarity(), reader, resolver);
@@ -485,8 +487,12 @@ class DescendantSelfAxisQuery extends Query implements JackrabbitQuery {
                     return currentDoc;
                 }
 
-                // try next
-                currentDoc = subScorer.nextDoc();
+                if (subScorer == null) {
+                    currentDoc = NO_MORE_DOCS;
+                } else {
+                    // try next
+                    currentDoc = subScorer.nextDoc();
+                }
             }
             return currentDoc;
         }
@@ -515,6 +521,10 @@ class DescendantSelfAxisQuery extends Query implements JackrabbitQuery {
                 }
                 currentDoc = NO_MORE_DOCS;
                 return currentDoc;
+            }
+
+            if (subScorer == null) {
+                return NO_MORE_DOCS;
             }
 
             currentDoc = subScorer.advance(target);
