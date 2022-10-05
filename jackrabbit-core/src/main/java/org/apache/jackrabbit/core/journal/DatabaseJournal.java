@@ -439,12 +439,12 @@ public class DatabaseJournal extends AbstractJournal implements DatabaseAware {
     protected void doSync(long startRevision, boolean startup) throws JournalException {
         if (!startup) {
             // if the cluster node is not starting do a normal sync
-            doSync(startRevision);
+            syncNow(startRevision, startup);
         } else {
             try {
                 startBatch();
                 try {
-                    doSync(startRevision);
+                    syncNow(startRevision, startup);
                 } finally {
                     endBatch(true);
                 }
