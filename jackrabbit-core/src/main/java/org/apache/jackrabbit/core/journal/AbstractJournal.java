@@ -230,7 +230,7 @@ public abstract class AbstractJournal implements Journal {
     protected void doSync(long startRevision, boolean startup) throws JournalException {
         // by default ignore startup parameter for backwards compatibility
         // only needed for persistence backend that need special treatment on startup.
-        doSync(startRevision);
+        syncNow(startRevision, startup);
     }
     
     /**
@@ -241,21 +241,45 @@ public abstract class AbstractJournal implements Journal {
      * @throws JournalException if an error occurs
      */
     protected void doSync(long startRevision) throws JournalException {
-        log.debug("Synchronize contents from journal. StartRevision: " + startRevision);
+        syncNow(startRevision, false);
+    }
+
+    /**
+     * <p>
+     *     During {@code startup}, even changes made by the cluster node itself must be synced. This is because of the
+     *     index export/import feature. During export/import the following situation can occur:
+     * </p>
+     * <p>
+     *     A cluster node (the container) gets restarted with a fresh new file system containing an index import on file
+     *     system. During startup, the journal log is queried to sync the changes which came in after the index export
+     *     was done. However, in case the restarted cluster node has the same cluster node id, it is likely that the
+     *     Journal table also contains change records indicating the change was made by the current cluster node. If
+     *     during startup these changes are skipped, the index misses all changes made by the cluster node after the
+     *     index export. To avoid this situation, make sure to even sync the changes made by the cluster node during
+     *     STARTUP! Note that changes made by a cluster node after startup never need to be synced as already processed
+     *     by the cluster node.
+     * </p>
+     */
+    protected void syncNow(final long startRevision, final boolean startup) throws JournalException {
+        if (startup) {
+            log.info("Startup synchronization contents from journal. StartRevision: {}", startRevision);
+        } else {
+            log.debug("Synchronize contents from journal. StartRevision: {}", startRevision);
+        }
         RecordIterator iterator = getRecords(startRevision);
         long stopRevision = Long.MIN_VALUE;
 
         try {
             while (iterator.hasNext()) {
                 Record record = iterator.nextRecord();
-                if (record.getJournalId().equals(id)) {
-                    log.debug("Record with revision '" + record.getRevision()
-                            + "' created by this journal, skipped.");
-                } else {
+                if (startup || !record.getJournalId().equals(id)) {
                     RecordConsumer consumer = getConsumer(record.getProducerId());
                     if (consumer != null) {
                         consumer.consume(record);
                     }
+                } else {
+                    log.debug("Record with revision '" + record.getRevision()
+                            + "' created by this journal, skipped.");
                 }
                 stopRevision = record.getRevision();
             }
