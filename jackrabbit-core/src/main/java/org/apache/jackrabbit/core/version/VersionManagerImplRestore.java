@@ -370,6 +370,39 @@ abstract public class VersionManagerImplRestore extends VersionManagerImplBase {
             throw new UnsupportedRepositoryOperationException(msg);
         }
 
+
+        // For each child node C present on N but not on F:
+        // - If C has an OPV of COPY, VERSION or ABORT then N/C is removed.
+        //   Note that while a node with a child item of OPV ABORT cannot be
+        //   versioned, it is legal for a previously versioned node to have such
+        //   a child item added to it and then for it to be restored to the state
+        //   that it had before that item was added, as this step indicates.
+        // - If C has an OPV of IGNORE then no change is made to N/C.
+        // - If C has an OPV of INITIALIZE then N/C is re-initialized as if it
+        //   were newly created, as defined in its node type.
+        // - If C has an OPV of COMPUTE then N/C may be re-initialized according
+        //   to an implementation-specific mechanism.
+
+        // NOTE this method MUST run before adjusting the mixins below because when setting the frozen node mixins on
+        // the workspace node, the workspace 'child.getDefinition()' can result in a ConstraintViolationException
+        LinkedList<ChildNodeEntry> toDelete = new LinkedList<ChildNodeEntry>();
+        for (ChildNodeEntry entry : state.getState().getChildNodeEntries()) {
+            if (!freeze.hasFrozenChildNode(entry.getName(), entry.getIndex())) {
+                NodeStateEx child = state.getNode(entry.getName(), entry.getIndex());
+
+                int opv = child.getDefinition().getOnParentVersion();
+                if (copy || opv == OnParentVersionAction.COPY
+                        || opv == OnParentVersionAction.VERSION
+                        || opv == OnParentVersionAction.ABORT) {
+                    toDelete.addFirst(entry);
+                } else if (opv == OnParentVersionAction.INITIALIZE) {
+                    log.warn("OPV.INITIALIZE not supported yet on restore of existing child nodes: " + safeGetJCRPath(child));
+                } else if (opv == OnParentVersionAction.COMPUTE) {
+                    log.warn("OPV.COMPUTE not supported yet on restore of existing child nodes: " + safeGetJCRPath(child));
+                }
+            }
+        }
+
         // adjust mixins
         state.setMixins(freeze.getFrozenMixinTypes());
 
@@ -443,33 +476,6 @@ abstract public class VersionManagerImplRestore extends VersionManagerImplBase {
             }
         }
 
-        // For each child node C present on N but not on F:
-        // - If C has an OPV of COPY, VERSION or ABORT then N/C is removed.
-        //   Note that while a node with a child item of OPV ABORT cannot be
-        //   versioned, it is legal for a previously versioned node to have such
-        //   a child item added to it and then for it to be restored to the state
-        //   that it had before that item was added, as this step indicates.
-        // - If C has an OPV of IGNORE then no change is made to N/C.
-        // - If C has an OPV of INITIALIZE then N/C is re-initialized as if it
-        //   were newly created, as defined in its node type.
-        // - If C has an OPV of COMPUTE then N/C may be re-initialized according
-        //   to an implementation-specific mechanism.
-        LinkedList<ChildNodeEntry> toDelete = new LinkedList<ChildNodeEntry>();
-        for (ChildNodeEntry entry: state.getState().getChildNodeEntries()) {
-            if (!freeze.hasFrozenChildNode(entry.getName(), entry.getIndex())) {
-                NodeStateEx child = state.getNode(entry.getName(), entry.getIndex());
-                int opv = child.getDefinition().getOnParentVersion();
-                if (copy || opv == OnParentVersionAction.COPY
-                        || opv == OnParentVersionAction.VERSION
-                        || opv == OnParentVersionAction.ABORT) {
-                    toDelete.addFirst(entry);
-                } else if (opv == OnParentVersionAction.INITIALIZE) {
-                    log.warn("OPV.INITIALIZE not supported yet on restore of existing child nodes: " + safeGetJCRPath(child));
-                } else if (opv == OnParentVersionAction.COMPUTE) {
-                    log.warn("OPV.COMPUTE not supported yet on restore of existing child nodes: " + safeGetJCRPath(child));
-                }
-            }
-        }
         for (ChildNodeEntry entry: toDelete) {
             state.removeNode(entry.getName(), entry.getIndex());
         }
