@@ -72,9 +72,9 @@
   </modules>
 
   <scm>
-    <connection>scm:svn:http://svn.apache.org/repos/asf/jackrabbit/tags/jackrabbit-2.21.19-h1</connection>
-    <developerConnection>scm:svn:https://svn.apache.org/repos/asf/jackrabbit/tags/jackrabbit-2.21.19-h1</developerConnection>
-    <url>http://svn.apache.org/viewvc/jackrabbit/tags/jackrabbit-2.21.19-h1</url>
+    <connection>scm:svn:http://svn.apache.org/repos/asf/jackrabbit/tags/jackrabbit-2.21.19</connection>
+    <developerConnection>scm:svn:https://svn.apache.org/repos/asf/jackrabbit/tags/jackrabbit-2.21.19</developerConnection>
+    <url>http://svn.apache.org/viewvc/jackrabbit/tags/jackrabbit-2.21.19</url>
   </scm>
 
   <build>

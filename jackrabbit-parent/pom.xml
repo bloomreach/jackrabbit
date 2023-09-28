@@ -760,8 +760,8 @@
   -->
 
   <scm>
-    <connection>scm:git:https://gitbox.apache.org/repos/asf/maven-apache-parent.git/jackrabbit-parent/tags/jackrabbit-2.21.19-h1/jackrabbit-parent</connection>
-    <developerConnection>scm:git:https://gitbox.apache.org/repos/asf/maven-apache-parent.git/jackrabbit-parent/tags/jackrabbit-2.21.19-h1/jackrabbit-parent</developerConnection>
-    <url>https://github.com/apache/maven-apache-parent/tree/apache-30/jackrabbit-parent/tags/jackrabbit-2.21.19-h1/jackrabbit-parent</url>
+    <connection>scm:git:https://gitbox.apache.org/repos/asf/maven-apache-parent.git/jackrabbit-parent/tags/jackrabbit-2.21.19/jackrabbit-parent</connection>
+    <developerConnection>scm:git:https://gitbox.apache.org/repos/asf/maven-apache-parent.git/jackrabbit-parent/tags/jackrabbit-2.21.19/jackrabbit-parent</developerConnection>
+    <url>https://github.com/apache/maven-apache-parent/tree/apache-30/jackrabbit-parent/tags/jackrabbit-2.21.19/jackrabbit-parent</url>
   </scm>
 </project>
