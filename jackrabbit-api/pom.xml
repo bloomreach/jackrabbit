@@ -57,7 +57,7 @@
     <dependency>
       <groupId>org.apache.jackrabbit</groupId>
       <artifactId>oak-jackrabbit-api</artifactId>
-      <version>${oak.version}</version>
+      <version>${oak-jackrabbit-api.version.implemented}</version>
     </dependency>
     <!-- nullability, see JCR-4301 -->
     <!-- This dependency is promoting the scope of jetbrains-annotations dependency that is
