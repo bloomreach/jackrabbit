@@ -16,8 +16,10 @@
  */
 package org.apache.jackrabbit.core.observation;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -62,7 +64,7 @@ public final class ObservationDispatcher extends EventDispatcher
     /**
      * Currently active synchronous <code>EventConsumer</code>s for notification.
      */
-    private Set<EventConsumer> synchronousConsumers = new HashSet<EventConsumer>();
+    private List<EventConsumer> synchronousConsumers = new ArrayList<EventConsumer>();
 
     /**
      * Set of <code>EventConsumer</code>s for read only Set access
@@ -72,7 +74,7 @@ public final class ObservationDispatcher extends EventDispatcher
     /**
      * Set of synchronous <code>EventConsumer</code>s for read only Set access.
      */
-    private Set<EventConsumer> synchronousReadOnlyConsumers;
+    private List<EventConsumer> synchronousReadOnlyConsumers;
 
     /**
      * synchronization monitor for listener changes
@@ -132,10 +134,10 @@ public final class ObservationDispatcher extends EventDispatcher
         }
     }
 
-    Set<EventConsumer> getSynchronousConsumers() {
+    List<EventConsumer> getSynchronousConsumers() {
         synchronized (consumerChange) {
             if (synchronousReadOnlyConsumers == null) {
-                synchronousReadOnlyConsumers = Collections.unmodifiableSet(new HashSet<EventConsumer>(synchronousConsumers));
+                synchronousReadOnlyConsumers = Collections.unmodifiableList(new ArrayList<>(synchronousConsumers));
             }
             return synchronousReadOnlyConsumers;
         }
@@ -178,6 +180,7 @@ public final class ObservationDispatcher extends EventDispatcher
      * prepare the events for dispatching.
      */
     void prepareEvents(EventStateCollection events) {
+        // order for prepare events is not important, hence Set is ok
         Set<EventConsumer> consumers = new HashSet<EventConsumer>();
         consumers.addAll(getSynchronousConsumers());
         consumers.addAll(getAsynchronousConsumers());
@@ -190,6 +193,7 @@ public final class ObservationDispatcher extends EventDispatcher
      * {@inheritDoc}
      */
     void prepareDeleted(EventStateCollection events, ChangeLog changes) {
+        // order for prepare deleted is not important, hence Set is ok
         Set<EventConsumer> consumers = new HashSet<EventConsumer>();
         consumers.addAll(getSynchronousConsumers());
         consumers.addAll(getAsynchronousConsumers());
@@ -215,8 +219,9 @@ public final class ObservationDispatcher extends EventDispatcher
                 log.debug("Stack trace:", new Exception());
             }
         }
-        // notify synchronous listeners
-        Set<EventConsumer> synchronous = getSynchronousConsumers();
+        // notify synchronous listeners in ORDER as the first synchronous event consumer is the
+        // SearchManager which updates the index and is by far the most time consuming
+        List<EventConsumer> synchronous = getSynchronousConsumers();
         if (log.isDebugEnabled()) {
             log.debug("notifying " + synchronous.size() + " synchronous listeners.");
         }
@@ -277,9 +282,13 @@ public final class ObservationDispatcher extends EventDispatcher
         synchronized (consumerChange) {
             if (consumer.getEventListener() instanceof SynchronousEventListener) {
                 // remove existing if any
-                synchronousConsumers.remove(consumer);
+                int index = synchronousConsumers.indexOf(consumer);
+                if (index == -1) {
+                    synchronousConsumers.add(consumer);
+                } else {
+                    synchronousConsumers.set(index, consumer);
+                }
                 // re-add it
-                synchronousConsumers.add(consumer);
                 // reset read only consumer set
                 synchronousReadOnlyConsumers = null;
             } else {
