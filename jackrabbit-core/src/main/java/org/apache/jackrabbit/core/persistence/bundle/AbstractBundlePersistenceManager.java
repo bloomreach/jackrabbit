@@ -717,6 +717,25 @@ public abstract class AbstractBundlePersistenceManager implements
         }
         changeLog.setUpdateSize(updateSize);
 
+        // only for an update of larger than 8 Mb, we first shrink the cache actively
+        if (updateSize > 8 * 1024 * 1024) {
+            final long maxMemorySize = bundles.getMaxMemorySize();
+            // never shrink below 8 * 1024 * 1024
+            final long temporaryMaxMemorySize = Math.max(8 * 1024 * 1024, maxMemorySize - updateSize);
+            log.info("Shrinking the bundle cache with {} to {}", updateSize, temporaryMaxMemorySize);
+            // this triggers the shrinking of the cache in one go such that it can accomodate the newly added
+            // node states without having to shrink very frequently during adding the newly added nodes
+            log.info("Elements in cache before shrinking : {}", bundles.getElementCount());
+            bundles.setMaxMemorySize(temporaryMaxMemorySize);
+            log.info("Elements in cache after shrinking : {}", bundles.getElementCount());
+            // reset to original max size: now we create space for the added / modified states to be added
+            bundles.setMaxMemorySize(maxMemorySize);
+        }
+        // cache the newly added / changed nodes
+        for (NodePropBundle bundle : modified.values()) {
+            bundles.put(bundle.getId(), bundle, bundle.getSize());
+        }
+
         // store the refs
         for (NodeReferences refs : changeLog.modifiedRefs()) {
             if (refs.hasReferences()) {
@@ -812,9 +831,10 @@ public abstract class AbstractBundlePersistenceManager implements
 
         // only put to cache if already exists. this is to ensure proper
         // overwrite and not creating big contention during bulk loads
-        if (bundles.containsKey(bundle.getId())) {
-            bundles.put(bundle.getId(), bundle, bundle.getSize());
-        }
+        // We commented this original JR code as we add all modified/added nodes at storeInternal more efficiently
+//        if (bundles.containsKey(bundle.getId())) {
+//            bundles.put(bundle.getId(), bundle, bundle.getSize());
+//        }
     }
 
     /**
